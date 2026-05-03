@@ -1,0 +1,32 @@
+@import "vis-timeline/styles/vis-timeline-graph2d.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.vis-timeline {
+  border: 1px solid #2a2a35 !important;
+  background: #14141a;
+  color: #e8e8ee;
+}
+.vis-time-axis .vis-text {
+  color: #8a8a98 !important;
+}
+.vis-item {
+  background: #2a2a3f !important;
+  border-color: #4a4a6a !important;
+  color: #e8e8ee !important;
+}
+.vis-item.vis-selected {
+  background: #7c5cff !important;
+  border-color: #7c5cff !important;
+}

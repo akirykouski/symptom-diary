@@ -1,0 +1,108 @@
+{
+  "app": {
+    "title": "Symptom Diary",
+    "tagline": "Local. Encrypted. Yours."
+  },
+  "setup": {
+    "heading": "Set a passphrase",
+    "intro": "Your data is encrypted with this passphrase. Forget it and there is no recovery — there is no cloud and no reset.",
+    "passphraseLabel": "Passphrase",
+    "confirmLabel": "Confirm passphrase",
+    "submit": "Create encrypted journal",
+    "creating": "Creating…",
+    "errorMismatch": "Passphrases do not match",
+    "errorTooShort": "Use at least 12 characters",
+    "errorGeneric": "Could not create journal"
+  },
+  "unlock": {
+    "heading": "Unlock journal",
+    "passphraseLabel": "Passphrase",
+    "submit": "Unlock",
+    "unlocking": "Unlocking…",
+    "errorWrong": "Wrong passphrase",
+    "errorGeneric": "Could not unlock"
+  },
+  "timeline": {
+    "heading": "Timeline",
+    "newEntry": "New entry",
+    "noEntries": "No entries yet. Click \"New entry\" to start.",
+    "lock": "Lock",
+    "tags": "Tags",
+    "filterAll": "All",
+    "loading": "Loading…"
+  },
+  "entry": {
+    "tsEvent": "When did this happen?",
+    "text": "What happened?",
+    "mood": "Mood",
+    "severity": "Severity",
+    "tags": "Tags",
+    "save": "Save",
+    "saving": "Saving…",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "moodValues": {
+      "-2": "very low",
+      "-1": "low",
+      "0": "neutral",
+      "1": "good",
+      "2": "great"
+    },
+    "severityHint": "0 = none, 10 = unbearable"
+  },
+  "tags": {
+    "manage": "Manage tags",
+    "newTag": "New tag",
+    "name": "Name",
+    "color": "Color",
+    "create": "Create",
+    "delete": "Delete",
+    "errorTaken": "Name already in use",
+    "empty": "No tags yet"
+  },
+  "llm": {
+    "title": "AI models (Ollama)",
+    "intro": "AI features run entirely on your machine through Ollama. Pull the models below and they will be used to extract entities and build the graph in the background.",
+    "checking": "Checking connection…",
+    "ollamaUp": "Ollama reachable at",
+    "ollamaDown": "Ollama not reachable. Install from ollama.com, then start it. The app will retry automatically.",
+    "modelInstalled": "installed",
+    "modelMissing": "missing",
+    "pullModel": "Pull",
+    "pulling": "Pulling…",
+    "pullCancel": "Cancel",
+    "pullDone": "Done",
+    "pullError": "Pull failed",
+    "modelLabel": "Model",
+    "customModel": "Custom model name",
+    "customPull": "Pull custom model",
+    "extractor": "Entity extractor",
+    "embedder": "Embeddings"
+  },
+  "graph": {
+    "title": "Graph",
+    "empty": "No entities yet — write a few entries and the graph will populate as they are processed.",
+    "loading": "Loading graph…",
+    "node": "Node",
+    "neighbors": "Neighbors",
+    "mentions": "Mentions",
+    "openEntity": "Open entity",
+    "merge": "Merge into…",
+    "rename": "Rename",
+    "deleteEntity": "Delete entity"
+  },
+  "queue": {
+    "queued": "queued",
+    "running": "running",
+    "failed": "failed"
+  },
+  "entries": {
+    "extractedEntities": "Extracted entities",
+    "noneYet": "None yet (still processing)",
+    "reextract": "Re-extract"
+  },
+  "errors": {
+    "network": "Network error",
+    "locked": "Session locked. Please unlock again."
+  }
+}
