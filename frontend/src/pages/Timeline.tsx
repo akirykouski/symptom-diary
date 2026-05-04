@@ -104,10 +104,19 @@ export default function Timeline() {
             ollamaUp={llm.data?.ollama ?? false}
           />
           <Link to="/graph" className="text-sm text-ink/60 hover:text-ink">
-            Graph
+            {t("nav.graph")}
+          </Link>
+          <Link to="/documents" className="text-sm text-ink/60 hover:text-ink">
+            {t("nav.documents")}
+          </Link>
+          <Link to="/labs" className="text-sm text-ink/60 hover:text-ink">
+            {t("nav.labs")}
+          </Link>
+          <Link to="/medications" className="text-sm text-ink/60 hover:text-ink">
+            {t("nav.medications")}
           </Link>
           <Link to="/llm" className="text-sm text-ink/60 hover:text-ink">
-            AI
+            {t("nav.ai")}
           </Link>
           <Link to="/tags" className="text-sm text-ink/60 hover:text-ink">
             {t("timeline.tags")}

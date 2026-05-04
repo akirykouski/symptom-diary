@@ -7,6 +7,9 @@ import Timeline from "./pages/Timeline";
 import Tags from "./pages/Tags";
 import LlmSetup from "./pages/LlmSetup";
 import GraphPage from "./pages/GraphPage";
+import DocumentsPage from "./pages/DocumentsPage";
+import LabsPage from "./pages/LabsPage";
+import MedicationsPage from "./pages/MedicationsPage";
 
 export default function App() {
   const status = useQuery({
@@ -58,6 +61,24 @@ export default function App() {
         path="/llm"
         element={
           !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : <LlmSetup />
+        }
+      />
+      <Route
+        path="/documents"
+        element={
+          !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : <DocumentsPage />
+        }
+      />
+      <Route
+        path="/labs"
+        element={
+          !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : <LabsPage />
+        }
+      />
+      <Route
+        path="/medications"
+        element={
+          !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : <MedicationsPage />
         }
       />
       <Route path="*" element={<Navigate to="/" />} />

@@ -11,6 +11,7 @@ extraction runs in parallel.
 """
 from __future__ import annotations
 
+import base64
 import json
 from typing import AsyncIterator
 
@@ -132,8 +133,14 @@ class OllamaClient:
         model: str | None = None,
         format_schema: dict | None = None,
         system: str | None = None,
+        images: list[bytes] | None = None,
+        timeout: float | None = None,
     ) -> dict:
-        """JSON-mode completion. Returns parsed dict; raises if invalid JSON."""
+        """JSON-mode completion. Returns parsed dict; raises if invalid JSON.
+
+        Pass `images=[jpeg_bytes, ...]` to use vision-capable models. Each
+        image is base64-encoded inline per Ollama's `images` field.
+        """
         m = model or LLM_MODEL
         body: dict[str, object] = {
             "model": m,
@@ -144,7 +151,9 @@ class OllamaClient:
         }
         if system:
             body["system"] = system
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        if images:
+            body["images"] = [base64.b64encode(b).decode("ascii") for b in images]
+        async with httpx.AsyncClient(timeout=timeout or self._timeout) as client:
             try:
                 r = await client.post(f"{self.base_url}/api/generate", json=body)
             except (httpx.HTTPError, OSError) as e:
@@ -159,3 +168,37 @@ class OllamaClient:
             return json.loads(raw)
         except json.JSONDecodeError as e:
             raise OllamaError(f"model returned non-JSON: {raw[:200]}") from e
+
+    async def generate_text(
+        self,
+        prompt: str,
+        *,
+        model: str | None = None,
+        system: str | None = None,
+        images: list[bytes] | None = None,
+        timeout: float | None = None,
+    ) -> str:
+        """Plain-text completion (no JSON mode). Used for free-form vision captions."""
+        m = model or LLM_MODEL
+        body: dict[str, object] = {
+            "model": m,
+            "prompt": prompt,
+            "stream": False,
+            "options": {"temperature": 0.2},
+        }
+        if system:
+            body["system"] = system
+        if images:
+            body["images"] = [base64.b64encode(b).decode("ascii") for b in images]
+        async with httpx.AsyncClient(timeout=timeout or self._timeout) as client:
+            try:
+                r = await client.post(f"{self.base_url}/api/generate", json=body)
+            except (httpx.HTTPError, OSError) as e:
+                raise OllamaError(f"ollama unreachable: {e}") from e
+        if r.status_code != 200:
+            raise OllamaError(f"generate {r.status_code}: {r.text}")
+        data = r.json()
+        raw = data.get("response", "")
+        if not isinstance(raw, str):
+            raise OllamaError(f"unexpected generate response: {data}")
+        return raw.strip()

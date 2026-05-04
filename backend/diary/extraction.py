@@ -385,11 +385,17 @@ async def process_one(
 
 
 async def worker_loop(*, idle_seconds: float = 1.0) -> None:
+    from . import media_jobs  # avoid circular import at module load
+
     llm = OllamaClient()
     logger.info("extraction worker started")
     while True:
         try:
-            await _tick(llm)
+            did_media = await _tick_media(llm, media_jobs)
+            did_text = await _tick(llm)
+            # If we did real work, keep looping fast; otherwise back off.
+            if did_media or did_text:
+                continue
         except asyncio.CancelledError:
             logger.info("extraction worker stopping")
             return
@@ -398,17 +404,28 @@ async def worker_loop(*, idle_seconds: float = 1.0) -> None:
         await asyncio.sleep(idle_seconds)
 
 
-async def _tick(llm: OllamaClient) -> None:
+async def _tick_media(llm: OllamaClient, media_jobs) -> bool:
     conn = store.peek_conn()
     if conn is None:
-        return
+        return False
+    try:
+        return await media_jobs.process_one(conn, llm=llm)
+    except Exception:  # noqa: BLE001
+        logger.exception("media tick failed")
+        return False
+
+
+async def _tick(llm: OllamaClient) -> bool:
+    conn = store.peek_conn()
+    if conn is None:
+        return False
     job = conn.execute(
         "SELECT entry_id, attempts FROM extraction_job "
         "WHERE status = 'queued' "
         "ORDER BY created_at ASC LIMIT 1"
     ).fetchone()
     if job is None:
-        return
+        return False
     entry_id = job["entry_id"]
     attempts = job["attempts"]
     now = _now()
@@ -426,7 +443,7 @@ async def _tick(llm: OllamaClient) -> None:
             (str(e), _now(), entry_id),
         )
         logger.warning("extraction failed for %s: %s", entry_id, e)
-        return
+        return True
     except Exception as e:  # noqa: BLE001
         conn.execute(
             "UPDATE extraction_job SET status = 'failed', last_error = ?, updated_at = ? "
@@ -434,13 +451,14 @@ async def _tick(llm: OllamaClient) -> None:
             (f"{type(e).__name__}: {e}", _now(), entry_id),
         )
         logger.exception("extraction crashed for %s", entry_id)
-        return
+        return True
 
     conn.execute(
         "UPDATE extraction_job SET status = 'done', last_error = NULL, updated_at = ? "
         "WHERE entry_id = ?",
         (_now(), entry_id),
     )
+    return True
 
 
 def enqueue_job(conn: sqlite3.Connection, entry_id: str) -> None:

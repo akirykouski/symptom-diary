@@ -4,7 +4,7 @@ A local, multimodal symptom diary with graph visualization and a background hypo
 
 ## Status
 
-**MVP-1** — encrypted local journal + Ollama-driven entity extraction + graph. The full roadmap lives in `../symptom-diary-plan (1).md`.
+**MVP-2** — encrypted local journal + Ollama-driven entity extraction + graph + multimodal capture (photos, audio, medical documents). The full roadmap lives in `../symptom-diary-plan (1).md`.
 
 ## What works today
 
@@ -19,6 +19,21 @@ A local, multimodal symptom diary with graph visualization and a background hypo
 - **Force-directed graph** (`/graph`) — entities colored by type, click for
   details + recent mentions + neighbors; right-click to focus; rename / merge / delete
 - Queue indicator on the timeline; "Re-extract" button on every entry
+- **Encrypted media attachments** (libsodium secretstream + HKDF subkey from passphrase)
+  - **Photos** — EXIF-stripped, resized, decrypted on-stream; vision Gemma writes a
+    short caption back into the entry
+  - **Audio** — uploaded encrypted; whisper.cpp (if installed) transcribes and
+    appends `> [audio transcript]` to the entry
+  - **Medical documents** (visit note / lab result / prescription / imaging /
+    discharge / referral) — vision Gemma extracts strict JSON which is broken
+    out into `document_record`, `lab_value`, `medication_record` rows. UI shows
+    an editable confirmation form before marking the document `verified`.
+- **Documents page** (`/documents`) — filter by type, drill into AI-extracted fields,
+  edit & verify
+- **Lab timeline** (`/labs`) — series view per test (e.g. TSH over years), with
+  high/low/in-range flags
+- **Medications page** (`/medications`) — every prescription extracted from any
+  document, sorted by date
 - React + Vite + i18n (English; RU/IT slots ready)
 
 ## Prerequisites
@@ -79,12 +94,26 @@ In the app, click "AI" in the timeline header. The page shows whether Ollama is 
 DIARY_LLM_MODEL=gemma3:4b ./run-backend.sh   # or any Ollama tag you have
 ```
 
-If Ollama is offline the extraction worker still records jobs as `failed`; once you start Ollama and click "Re-extract" on an entry, processing resumes.
+If Ollama is offline the extraction worker still records jobs as `failed`; once you start Ollama and click "Re-extract" on an entry, processing resumes. The same applies to media — if you upload a photo while Ollama is down, the photo is encrypted and stored, and you can click "Re-run AI" once Ollama is up.
+
+### whisper.cpp (audio transcription)
+
+Audio is **always** stored encrypted regardless of whether whisper is available — uploading still works, you just won't get an automatic transcript. To enable transcription:
+
+1. Build or download `whisper-cli` from <https://github.com/ggerganov/whisper.cpp>
+2. Download a ggml model (e.g. `ggml-small.bin`)
+3. Export both paths before launching the backend:
+
+   ```bash
+   export DIARY_WHISPER_BIN=/path/to/whisper-cli
+   export DIARY_WHISPER_MODEL=/path/to/ggml-small.bin
+   ```
 
 ## Storage
 
 - DB: `~/.symptom-diary/data/diary.sqlite` (SQLCipher-encrypted)
 - Salt: `~/.symptom-diary/data/diary.salt`
+- Media: `~/.symptom-diary/data/media/<entry_id>/<media_id>.enc` (libsodium-encrypted)
 - Override with `DIARY_DATA_DIR=/some/path`
 
 There is **no recovery**. If you lose the passphrase, the data is gone.
@@ -94,7 +123,7 @@ There is **no recovery**. If you lose the passphrase, the data is gone.
 ```bash
 cd backend
 .venv/bin/pytest -q
-# 12 passed
+# 23 passed
 ```
 
 ## Smoke checklist (manual UI test)
@@ -153,4 +182,4 @@ symptom-diary/
 
 ## Roadmap
 
-See `../symptom-diary-plan (1).md`. Next phase is MVP-1: Ollama integration, entity extraction, force-directed graph.
+See `../symptom-diary-plan (1).md`. Next phase is MVP-3: brief PDF for clinicians, Hypothesis Engine, ask-anything.

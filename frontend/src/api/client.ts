@@ -147,6 +147,59 @@ export const api = {
     request<QueueStatus>("GET", "/api/entries/queue/status"),
   entryEntities: (id: string) =>
     request<EntryEntity[]>("GET", `/api/entries/${id}/entities`),
+
+  // media
+  listEntryMedia: (entryId: string) =>
+    request<Media[]>("GET", `/api/entries/${entryId}/media`),
+  uploadMedia: async (entryId: string, file: File, kind: MediaKind) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("kind", kind);
+    const r = await fetch(`/api/entries/${entryId}/media`, {
+      method: "POST",
+      body: fd,
+      credentials: "include",
+    });
+    if (!r.ok) {
+      throw new ApiError(r.status, await r.text());
+    }
+    return (await r.json()) as Media;
+  },
+  deleteMedia: (id: string) => request<void>("DELETE", `/api/media/${id}`),
+  reprocessMedia: (id: string) =>
+    request<{ status: string }>("POST", `/api/media/${id}/reprocess`),
+  mediaUrl: (id: string) => `/api/media/${id}`,
+  mediaThumbUrl: (id: string) => `/api/media/${id}/thumbnail`,
+
+  // documents
+  listDocuments: (params?: { from?: string; to?: string; type?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.from) q.set("from", params.from);
+    if (params?.to) q.set("to", params.to);
+    if (params?.type) q.set("type", params.type);
+    const suffix = q.toString();
+    return request<DocumentRecord[]>(
+      "GET",
+      suffix ? `/api/documents?${suffix}` : "/api/documents",
+    );
+  },
+  getDocument: (id: string) => request<DocumentRecord>("GET", `/api/documents/${id}`),
+  patchDocument: (id: string, body: Partial<DocumentRecord>) =>
+    request<DocumentRecord>("PATCH", `/api/documents/${id}`, body),
+
+  // labs
+  labsTests: () =>
+    request<{ test_name: string; count: number }[]>("GET", "/api/labs/tests"),
+  labsTimeline: (test: string, params?: { from?: string; to?: string }) => {
+    const q = new URLSearchParams({ test });
+    if (params?.from) q.set("from", params.from);
+    if (params?.to) q.set("to", params.to);
+    return request<LabSeries>("GET", `/api/labs/timeline?${q.toString()}`);
+  },
+
+  // medications
+  medicationsTimeline: () =>
+    request<MedicationRecord[]>("GET", "/api/medications/timeline"),
 };
 
 export interface EntryEntity {
@@ -221,6 +274,83 @@ export interface QueueStatus {
   running: number;
   done: number;
   failed: number;
+}
+
+export type MediaKind = "image" | "audio" | "document";
+
+export interface Media {
+  id: string;
+  entry_id: string;
+  kind: MediaKind;
+  mime: string;
+  bytes: number;
+  duration_ms: number | null;
+  width: number | null;
+  height: number | null;
+  description: string | null;
+  transcript: string | null;
+  status: "pending" | "running" | "done" | "failed";
+  last_error: string | null;
+  processed_at: string | null;
+  created_at: string;
+}
+
+export interface LabValue {
+  id: string;
+  test_name: string;
+  test_name_raw: string;
+  value_numeric: number | null;
+  value_text: string | null;
+  unit: string | null;
+  reference_low: number | null;
+  reference_high: number | null;
+  is_abnormal: number | null;
+  measured_at: string | null;
+}
+
+export interface MedicationRecord {
+  id: string;
+  drug_name: string;
+  drug_name_raw: string;
+  dose: string | null;
+  frequency: string | null;
+  duration: string | null;
+  prescribed_at: string | null;
+}
+
+export interface DocumentRecord {
+  id: string;
+  media_id: string;
+  entry_id: string;
+  doc_type: string;
+  doc_date: string | null;
+  clinician_name: string | null;
+  clinician_specialty: string | null;
+  facility: string | null;
+  language_detected: string | null;
+  findings_md: string | null;
+  recommendations_md: string | null;
+  user_verified: number;
+  lab_values: LabValue[];
+  medications: MedicationRecord[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LabPoint {
+  measured_at: string | null;
+  value_numeric: number | null;
+  value_text: string | null;
+  unit: string | null;
+  is_abnormal: number | null;
+  reference_low: number | null;
+  reference_high: number | null;
+  document_id: string;
+}
+
+export interface LabSeries {
+  test_name: string;
+  points: LabPoint[];
 }
 
 /**

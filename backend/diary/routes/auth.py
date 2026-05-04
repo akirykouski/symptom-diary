@@ -35,7 +35,7 @@ def auth_setup(body: SetupRequest, response: Response) -> AuthStatus:
         except OSError:
             pass
         raise HTTPException(status_code=500, detail=str(e)) from e
-    token = store.unlock(conn)
+    token = store.unlock(conn, key)
     response.set_cookie(
         SESSION_COOKIE,
         token,
@@ -57,7 +57,7 @@ def auth_unlock(body: UnlockRequest, response: Response) -> AuthStatus:
         conn = open_db(key)
     except DBError:
         raise HTTPException(status_code=401, detail="invalid_passphrase")
-    token = store.unlock(conn)
+    token = store.unlock(conn, key)
     response.set_cookie(
         SESSION_COOKIE,
         token,

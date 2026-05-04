@@ -104,5 +104,88 @@
   "errors": {
     "network": "Network error",
     "locked": "Session locked. Please unlock again."
+  },
+  "nav": {
+    "timeline": "Timeline",
+    "graph": "Graph",
+    "documents": "Documents",
+    "labs": "Labs",
+    "medications": "Meds",
+    "ai": "AI"
+  },
+  "media": {
+    "heading": "Attachments",
+    "attachPhoto": "Photo",
+    "attachAudio": "Audio",
+    "attachDocument": "Document",
+    "uploading": "Uploading…",
+    "empty": "No attachments yet",
+    "delete": "Delete",
+    "reprocess": "Re-run AI"
+  },
+  "documents": {
+    "heading": "Medical documents",
+    "loading": "Loading…",
+    "empty": "No documents yet. Attach a visit note or lab from any entry to populate this view.",
+    "all": "All",
+    "labsLink": "Labs",
+    "medsLink": "Medications",
+    "verified": "verified",
+    "aiOnly": "needs review",
+    "unknownClinician": "Unknown clinician",
+    "openOriginal": "Open original",
+    "labs": "Lab values",
+    "medications": "Medications",
+    "saving": "Saving…",
+    "confirm": "Confirm and save",
+    "disclaimer": "AI extracted these fields from a photo of the document. Verify before treating any value as authoritative — this is not a diagnosis.",
+    "types": {
+      "visit_note": "Visit note",
+      "lab_result": "Lab result",
+      "prescription": "Prescription",
+      "imaging": "Imaging",
+      "discharge": "Discharge",
+      "referral": "Referral",
+      "other": "Other"
+    },
+    "fields": {
+      "docDate": "Document date",
+      "clinician": "Clinician",
+      "specialty": "Specialty",
+      "facility": "Facility",
+      "findings": "Findings (verbatim)",
+      "recommendations": "Recommendations (verbatim)"
+    },
+    "labCols": {
+      "test": "Test",
+      "value": "Value",
+      "unit": "Unit",
+      "range": "Reference",
+      "flag": "Flag"
+    }
+  },
+  "labs": {
+    "heading": "Lab timeline",
+    "documentsLink": "Documents",
+    "loading": "Loading…",
+    "empty": "No lab values recorded yet. Attach a lab result document to populate this view.",
+    "pickPrompt": "Pick a test on the left to see its history.",
+    "stats": {
+      "min": "min",
+      "max": "max",
+      "range": "range"
+    }
+  },
+  "medications": {
+    "heading": "Medications",
+    "loading": "Loading…",
+    "empty": "No medications recorded yet. Attach a prescription or visit note to populate this view.",
+    "cols": {
+      "drug": "Drug",
+      "dose": "Dose",
+      "frequency": "Frequency",
+      "duration": "Duration",
+      "prescribed": "Prescribed"
+    }
   }
 }

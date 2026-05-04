@@ -5,6 +5,7 @@ import MDEditor from "@uiw/react-md-editor";
 import type { Entry, Tag } from "../api/client";
 import { api } from "../api/client";
 import TagPicker from "./TagPicker";
+import MediaPanel from "./MediaPanel";
 
 export interface EntryDraft {
   ts_event: string;
@@ -121,6 +122,7 @@ export default function EntryEditor({
         <TagPicker tags={tags} selected={tagIds} onChange={setTagIds} />
       </div>
 
+      {initial && <MediaPanel entryId={initial.id} />}
       {initial && <ExtractedEntitiesPanel entryId={initial.id} />}
 
       <div className="flex gap-2 pt-2">
