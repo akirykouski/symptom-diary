@@ -111,7 +111,60 @@
     "documents": "Documents",
     "labs": "Labs",
     "medications": "Meds",
-    "ai": "AI"
+    "ai": "AI",
+    "hypotheses": "Patterns",
+    "hypothesesHint": "AI-noticed patterns the engine wants you to discuss with a clinician",
+    "brief": "Brief"
+  },
+  "safety": {
+    "banner": "This software helps you organise patient-reported context. It is NOT a diagnosis. Discuss findings with a licensed clinician.",
+    "dismiss": "Hide for this session"
+  },
+  "hypotheses": {
+    "heading": "AI-noticed patterns",
+    "loading": "Loading patterns…",
+    "checking": "Re-checking…",
+    "recheck": "Re-check now",
+    "filter": {
+      "active": "Active",
+      "all": "All",
+      "dismissed": "Dismissed",
+      "confirmed": "Already evaluated"
+    },
+    "evidence": "Evidence:",
+    "showEvidence": "Show how this matched",
+    "hideEvidence": "Hide evidence",
+    "openReference": "Reference",
+    "dismiss": "Dismiss",
+    "dismissConfirm": "Confirm",
+    "dismissReasonPlaceholder": "Why? (e.g. doctor already ruled out)",
+    "alreadyEvaluated": "Already evaluated",
+    "reactivate": "Reactivate",
+    "suggestedNext": "Suggested next step:",
+    "disclaimerHeading": "These are pattern observations, not diagnoses.",
+    "disclaimerBody": "The engine compares your journal against curated profiles of common and rare conditions. Each card cites the entries and lab values that contributed. Bring the cited journal entries to a clinician — they decide whether further evaluation is warranted.",
+    "empty": "No patterns to show yet. Add a few entries (or load a demo patient from the Timeline) and re-check."
+  },
+  "insights": {
+    "heading": "Clinician brief",
+    "generate": "Generate brief",
+    "generating": "Generating…",
+    "printable": "Open printable version",
+    "enrich": "Add AI summary paragraph",
+    "disclaimer": "This brief is patient-reported context for clinical evaluation. Every assertion in it cites the underlying journal entry. It is not a diagnosis.",
+    "stats": {
+      "entries": "Entries",
+      "documents": "Documents",
+      "abnLabs": "Abnormal labs",
+      "medications": "Medications",
+      "hypotheses": "AI patterns"
+    }
+  },
+  "demo": {
+    "button": "Load demo patient",
+    "tooltip": "Replace journal contents with a curated synthetic patient for demo or evaluation",
+    "heading": "Curated synthetic patients",
+    "warnOverwrite": "Selecting a persona will replace your current entries."
   },
   "media": {
     "heading": "Attachments",

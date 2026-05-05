@@ -200,6 +200,65 @@ export const api = {
   // medications
   medicationsTimeline: () =>
     request<MedicationRecord[]>("GET", "/api/medications/timeline"),
+
+  // hypotheses
+  listHypotheses: (status: "active" | "all" | "dismissed" | "confirmed" | "expired" = "active") =>
+    request<Hypothesis[]>("GET", `/api/hypotheses?status=${status}`),
+  getHypothesis: (id: string) => request<Hypothesis>("GET", `/api/hypotheses/${id}`),
+  patchHypothesis: (
+    id: string,
+    body: { status?: string; user_note?: string; dismissed_reason?: string },
+  ) => request<Hypothesis>("PATCH", `/api/hypotheses/${id}`, body),
+  recheckHypotheses: () =>
+    request<{ candidates_considered: number; hypotheses_written: number; user_signals: number }>(
+      "POST",
+      "/api/hypotheses/recheck",
+    ),
+  kbStatus: () =>
+    request<{
+      disease_count: number;
+      feature_count: number;
+      embedded_feature_count: number;
+      last_synced_at: string | null;
+      seed_version: number | null;
+    }>("GET", "/api/kb/status"),
+  kbSync: (embed = true) =>
+    request<{
+      inserted_diseases: number;
+      inserted_features: number;
+      embedded_features: number;
+      embed_failures: number;
+    }>("POST", `/api/kb/sync?embed=${embed}`),
+
+  // brief
+  generateBrief: (body?: { from_?: string; to?: string; enrich?: boolean }) =>
+    request<{ markdown: string; stats: BriefStats }>(
+      "POST",
+      "/api/insights/brief",
+      body ?? {},
+    ),
+  briefHtmlUrl: (params?: { from?: string; to?: string; enrich?: boolean }) => {
+    const q = new URLSearchParams();
+    if (params?.from) q.set("from", params.from);
+    if (params?.to) q.set("to", params.to);
+    if (params?.enrich) q.set("enrich", "true");
+    const suffix = q.toString();
+    return suffix ? `/api/insights/brief.html?${suffix}` : "/api/insights/brief.html";
+  },
+
+  // demo
+  listPersonas: () =>
+    request<{ id: string; title: string; summary: string }[]>("GET", "/api/demo/personas"),
+  loadPersona: (persona_id: string, overwrite = false) =>
+    request<{
+      persona_id: string;
+      entries: number;
+      documents: number;
+      lab_values: number;
+      medications: number;
+    }>("POST", "/api/demo/load", { persona_id, overwrite }),
+  activePersona: () =>
+    request<{ persona_id: string | null }>("GET", "/api/demo/active"),
 };
 
 export interface EntryEntity {
@@ -351,6 +410,47 @@ export interface LabPoint {
 export interface LabSeries {
   test_name: string;
   points: LabPoint[];
+}
+
+export type SignalStrength = "weak" | "moderate" | "strong";
+export type HypothesisStatus = "active" | "dismissed" | "expired" | "confirmed";
+
+export interface MatchedFeature {
+  feature_name: string;
+  frequency_class: string;
+  similarity: number;
+  matched_signal: string;
+  signal_kind: string;
+}
+
+export interface Hypothesis {
+  id: string;
+  disease_id: string;
+  disease_name: string;
+  category: string | null;
+  source_url: string;
+  red_flag: number;
+  match_score: number;
+  signal_strength: SignalStrength;
+  rationale_md: string;
+  suggested_actions_md: string | null;
+  cited_entry_ids: string[];
+  cited_lab_value_ids: string[];
+  cited_medication_ids: string[];
+  matched_features: MatchedFeature[];
+  status: HypothesisStatus;
+  generated_at: string;
+  expires_at: string;
+  user_note: string | null;
+  dismissed_reason: string | null;
+}
+
+export interface BriefStats {
+  entries: number;
+  documents: number;
+  abnormal_labs: number;
+  medications: number;
+  hypotheses: number;
 }
 
 /**

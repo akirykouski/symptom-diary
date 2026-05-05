@@ -21,12 +21,16 @@ frontend/.vite/
 *.tsbuildinfo
 .DS_Store
 
-# Local data (NEVER commit)
-data/
+# Local user data (NEVER commit)
 *.sqlite
 *.sqlite-journal
 *.db
 *.salt
+# Bundled assets (e.g. backend/diary/data/diseases_seed.json) ARE committed; only
+# user-side runtime data dirs are excluded:
+/data/
+backend/data/
+frontend/data/
 
 # IDE
 .idea/

@@ -1,0 +1,816 @@
+{
+  "version": 1,
+  "generated_at": "2026-05-05",
+  "license": "Curated for the symptom-diary hackathon. Each profile cites its public source. Replace with full Orphanet sync (POST /api/kb/sync) for production breadth.",
+  "diseases": [
+    {
+      "id": "seed:sle",
+      "name": "Systemic lupus erythematosus",
+      "synonyms": ["lupus", "SLE"],
+      "prevalence_class": "1-5/10000",
+      "inheritance": "multifactorial",
+      "age_of_onset": "young adult",
+      "category": "autoimmune",
+      "description_md": "Chronic autoimmune disease that can affect skin, joints, kidneys, blood cells, brain and other organs. Course is highly variable and often relapsing-remitting.",
+      "source_url": "https://www.orpha.net/en/disease/detail/536",
+      "features": [
+        {"name": "malar rash", "kind": "sign", "frequency": "very_frequent"},
+        {"name": "butterfly rash on face", "kind": "sign", "frequency": "very_frequent"},
+        {"name": "photosensitive skin rash", "kind": "sign", "frequency": "frequent"},
+        {"name": "oral ulcers", "kind": "symptom", "frequency": "frequent"},
+        {"name": "joint pain", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "joint swelling", "kind": "symptom", "frequency": "frequent"},
+        {"name": "fatigue", "kind": "symptom", "frequency": "obligate"},
+        {"name": "hair loss", "kind": "symptom", "frequency": "frequent"},
+        {"name": "raynaud phenomenon", "kind": "symptom", "frequency": "frequent"},
+        {"name": "low complement c3", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "low complement c4", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "ana positive antinuclear antibody", "kind": "lab_pattern", "frequency": "obligate"},
+        {"name": "anti dsdna elevated", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "low wbc white blood cell", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "proteinuria protein in urine", "kind": "lab_pattern", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:hashimoto",
+      "name": "Hashimoto thyroiditis (autoimmune hypothyroidism)",
+      "synonyms": ["hashimoto", "autoimmune thyroiditis", "chronic lymphocytic thyroiditis"],
+      "prevalence_class": "common",
+      "inheritance": "multifactorial",
+      "age_of_onset": "adult",
+      "category": "autoimmune",
+      "description_md": "Autoimmune destruction of the thyroid gland causing progressive hypothyroidism. Common in women.",
+      "source_url": "https://medlineplus.gov/ency/article/000371.htm",
+      "features": [
+        {"name": "fatigue", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "weight gain", "kind": "symptom", "frequency": "frequent"},
+        {"name": "cold intolerance", "kind": "symptom", "frequency": "frequent"},
+        {"name": "constipation", "kind": "symptom", "frequency": "frequent"},
+        {"name": "dry skin", "kind": "symptom", "frequency": "frequent"},
+        {"name": "hair thinning", "kind": "symptom", "frequency": "frequent"},
+        {"name": "depressed mood", "kind": "symptom", "frequency": "frequent"},
+        {"name": "muscle aches", "kind": "symptom", "frequency": "frequent"},
+        {"name": "elevated tsh", "kind": "lab_pattern", "frequency": "obligate"},
+        {"name": "low free t4", "kind": "lab_pattern", "frequency": "very_frequent"},
+        {"name": "anti tpo antibodies", "kind": "lab_pattern", "frequency": "very_frequent"}
+      ]
+    },
+    {
+      "id": "seed:graves",
+      "name": "Graves disease (autoimmune hyperthyroidism)",
+      "synonyms": ["graves", "hyperthyroidism", "thyrotoxicosis"],
+      "prevalence_class": "common",
+      "category": "autoimmune",
+      "description_md": "Autoimmune over-stimulation of the thyroid causing hyperthyroidism, often with eye involvement.",
+      "source_url": "https://medlineplus.gov/ency/article/000358.htm",
+      "features": [
+        {"name": "weight loss", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "rapid heartbeat", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "palpitations", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "heat intolerance", "kind": "symptom", "frequency": "frequent"},
+        {"name": "tremor", "kind": "symptom", "frequency": "frequent"},
+        {"name": "anxiety", "kind": "symptom", "frequency": "frequent"},
+        {"name": "bulging eyes", "kind": "sign", "frequency": "frequent"},
+        {"name": "diarrhea", "kind": "symptom", "frequency": "frequent"},
+        {"name": "low tsh", "kind": "lab_pattern", "frequency": "obligate"},
+        {"name": "elevated free t4", "kind": "lab_pattern", "frequency": "very_frequent"},
+        {"name": "anti tsh receptor antibody trab", "kind": "lab_pattern", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:celiac",
+      "name": "Celiac disease",
+      "synonyms": ["celiac", "coeliac", "gluten enteropathy"],
+      "prevalence_class": "1/100",
+      "category": "gi",
+      "description_md": "Autoimmune reaction to dietary gluten that damages the small intestine. Often presents with non-GI features (anemia, fatigue, neurologic).",
+      "source_url": "https://www.orpha.net/en/disease/detail/555",
+      "features": [
+        {"name": "chronic diarrhea", "kind": "symptom", "frequency": "frequent"},
+        {"name": "bloating after gluten", "kind": "symptom", "frequency": "frequent"},
+        {"name": "abdominal pain", "kind": "symptom", "frequency": "frequent"},
+        {"name": "weight loss", "kind": "symptom", "frequency": "frequent"},
+        {"name": "iron deficiency anemia", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "low ferritin", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "fatigue", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "vitamin d deficiency", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "vitamin b12 deficiency", "kind": "lab_pattern", "frequency": "occasional"},
+        {"name": "dermatitis herpetiformis rash", "kind": "sign", "frequency": "occasional"},
+        {"name": "anti tissue transglutaminase iga", "kind": "lab_pattern", "frequency": "very_frequent"}
+      ]
+    },
+    {
+      "id": "seed:crohn",
+      "name": "Crohn disease",
+      "synonyms": ["crohn", "regional enteritis"],
+      "prevalence_class": "1-5/1000",
+      "category": "gi",
+      "description_md": "Chronic inflammatory bowel disease that can affect any part of the GI tract, often with extra-intestinal features.",
+      "source_url": "https://www.orpha.net/en/disease/detail/206",
+      "features": [
+        {"name": "chronic diarrhea", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "bloody stools", "kind": "symptom", "frequency": "frequent"},
+        {"name": "abdominal pain", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "weight loss", "kind": "symptom", "frequency": "frequent"},
+        {"name": "fatigue", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "fever", "kind": "symptom", "frequency": "frequent"},
+        {"name": "perianal abscess", "kind": "sign", "frequency": "occasional"},
+        {"name": "elevated crp", "kind": "lab_pattern", "frequency": "very_frequent"},
+        {"name": "elevated calprotectin in stool", "kind": "lab_pattern", "frequency": "very_frequent"},
+        {"name": "iron deficiency anemia", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "low albumin", "kind": "lab_pattern", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:uc",
+      "name": "Ulcerative colitis",
+      "synonyms": ["ulcerative colitis", "uc"],
+      "prevalence_class": "1-5/1000",
+      "category": "gi",
+      "description_md": "Chronic inflammatory disease of the colon causing bloody diarrhea and urgency.",
+      "source_url": "https://medlineplus.gov/ency/article/000250.htm",
+      "features": [
+        {"name": "bloody diarrhea", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "rectal urgency", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "abdominal cramps", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "tenesmus", "kind": "symptom", "frequency": "frequent"},
+        {"name": "fatigue", "kind": "symptom", "frequency": "frequent"},
+        {"name": "weight loss", "kind": "symptom", "frequency": "frequent"},
+        {"name": "elevated calprotectin in stool", "kind": "lab_pattern", "frequency": "very_frequent"},
+        {"name": "iron deficiency anemia", "kind": "lab_pattern", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:mcas",
+      "name": "Mast cell activation syndrome",
+      "synonyms": ["mcas", "mast cell activation"],
+      "prevalence_class": "rare",
+      "category": "allergy",
+      "description_md": "Episodic systemic release of mast cell mediators triggering flushing, GI symptoms, hypotension, and itching across multiple systems.",
+      "source_url": "https://www.orpha.net/en/disease/detail/98292",
+      "red_flag": 0,
+      "features": [
+        {"name": "episodic flushing of skin", "kind": "sign", "frequency": "very_frequent"},
+        {"name": "hives urticaria", "kind": "sign", "frequency": "frequent"},
+        {"name": "itching", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "abdominal pain after eating", "kind": "symptom", "frequency": "frequent"},
+        {"name": "diarrhea", "kind": "symptom", "frequency": "frequent"},
+        {"name": "lightheadedness", "kind": "symptom", "frequency": "frequent"},
+        {"name": "rapid heartbeat after triggers", "kind": "symptom", "frequency": "frequent"},
+        {"name": "headache after triggers", "kind": "symptom", "frequency": "frequent"},
+        {"name": "anaphylaxis episodes", "kind": "symptom", "frequency": "occasional"},
+        {"name": "elevated tryptase", "kind": "lab_pattern", "frequency": "occasional"},
+        {"name": "trigger food alcohol heat exercise", "kind": "temporal", "frequency": "very_frequent"}
+      ]
+    },
+    {
+      "id": "seed:hereditary_angioedema",
+      "name": "Hereditary angioedema",
+      "synonyms": ["hae", "c1 inhibitor deficiency"],
+      "prevalence_class": "1/50000",
+      "category": "allergy",
+      "description_md": "Recurrent, painful, non-itchy swelling of skin, gut and airway. Bradykinin-mediated; antihistamines do not help.",
+      "source_url": "https://www.orpha.net/en/disease/detail/91378",
+      "red_flag": 1,
+      "features": [
+        {"name": "recurrent swelling of face hands feet", "kind": "sign", "frequency": "obligate"},
+        {"name": "abdominal pain attacks", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "throat tightness", "kind": "symptom", "frequency": "occasional"},
+        {"name": "swelling without itching", "kind": "sign", "frequency": "very_frequent"},
+        {"name": "swelling triggered by trauma stress", "kind": "temporal", "frequency": "frequent"},
+        {"name": "low c1 esterase inhibitor level", "kind": "lab_pattern", "frequency": "very_frequent"},
+        {"name": "low c4 complement", "kind": "lab_pattern", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:pots",
+      "name": "Postural orthostatic tachycardia syndrome",
+      "synonyms": ["pots", "postural tachycardia"],
+      "prevalence_class": "1-5/1000",
+      "category": "neuro",
+      "description_md": "Sustained heart rate increase on standing without significant blood-pressure drop, with chronic dysautonomic symptoms.",
+      "source_url": "https://www.orpha.net/en/disease/detail/44892",
+      "features": [
+        {"name": "rapid heartbeat on standing", "kind": "symptom", "frequency": "obligate"},
+        {"name": "lightheadedness on standing", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "fatigue", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "brain fog", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "exercise intolerance", "kind": "symptom", "frequency": "frequent"},
+        {"name": "headache", "kind": "symptom", "frequency": "frequent"},
+        {"name": "nausea", "kind": "symptom", "frequency": "frequent"},
+        {"name": "blood pooling in legs", "kind": "sign", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:eds_h",
+      "name": "Hypermobile Ehlers-Danlos syndrome",
+      "synonyms": ["heds", "hypermobile eds", "ehlers danlos"],
+      "prevalence_class": "1-5/10000",
+      "category": "connective_tissue",
+      "description_md": "Heritable connective-tissue disorder with joint hypermobility, chronic pain, frequent subluxations, and frequent overlap with POTS and MCAS.",
+      "source_url": "https://www.orpha.net/en/disease/detail/285",
+      "features": [
+        {"name": "joint hypermobility", "kind": "sign", "frequency": "obligate"},
+        {"name": "frequent joint dislocations subluxations", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "chronic widespread joint pain", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "easy bruising", "kind": "sign", "frequency": "frequent"},
+        {"name": "soft stretchy skin", "kind": "sign", "frequency": "frequent"},
+        {"name": "fatigue", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "lightheadedness on standing", "kind": "symptom", "frequency": "frequent"},
+        {"name": "irritable bowel symptoms", "kind": "symptom", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:fibromyalgia",
+      "name": "Fibromyalgia",
+      "synonyms": ["fibromyalgia"],
+      "prevalence_class": "common",
+      "category": "neuro",
+      "description_md": "Chronic widespread pain syndrome with fatigue, sleep disturbance and cognitive symptoms.",
+      "source_url": "https://medlineplus.gov/fibromyalgia.html",
+      "features": [
+        {"name": "chronic widespread musculoskeletal pain", "kind": "symptom", "frequency": "obligate"},
+        {"name": "fatigue", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "non restorative sleep", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "brain fog", "kind": "symptom", "frequency": "frequent"},
+        {"name": "tender points on palpation", "kind": "sign", "frequency": "frequent"},
+        {"name": "morning stiffness", "kind": "symptom", "frequency": "frequent"},
+        {"name": "irritable bowel symptoms", "kind": "symptom", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:cfs",
+      "name": "Myalgic encephalomyelitis / chronic fatigue syndrome",
+      "synonyms": ["me/cfs", "chronic fatigue syndrome"],
+      "prevalence_class": "rare",
+      "category": "neuro",
+      "description_md": "Severe debilitating fatigue not relieved by rest, with post-exertional malaise lasting more than 24 hours after activity.",
+      "source_url": "https://www.orpha.net/en/disease/detail/2912",
+      "features": [
+        {"name": "post exertional malaise", "kind": "symptom", "frequency": "obligate"},
+        {"name": "severe fatigue not relieved by rest", "kind": "symptom", "frequency": "obligate"},
+        {"name": "non restorative sleep", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "brain fog", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "lightheadedness on standing", "kind": "symptom", "frequency": "frequent"},
+        {"name": "muscle aches", "kind": "symptom", "frequency": "frequent"},
+        {"name": "sore throat", "kind": "symptom", "frequency": "occasional"},
+        {"name": "tender lymph nodes", "kind": "sign", "frequency": "occasional"}
+      ]
+    },
+    {
+      "id": "seed:migraine",
+      "name": "Migraine",
+      "synonyms": ["migraine", "migraine headache"],
+      "prevalence_class": "common",
+      "category": "neuro",
+      "description_md": "Recurrent headache disorder with throbbing pain, often unilateral, with photophobia, phonophobia, nausea, and sometimes aura.",
+      "source_url": "https://medlineplus.gov/migraine.html",
+      "features": [
+        {"name": "unilateral throbbing headache", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "headache after coffee withdrawal", "kind": "temporal", "frequency": "occasional"},
+        {"name": "headache triggered by red wine cheese", "kind": "temporal", "frequency": "occasional"},
+        {"name": "nausea with headache", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "vomiting with headache", "kind": "symptom", "frequency": "frequent"},
+        {"name": "light sensitivity photophobia", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "sound sensitivity phonophobia", "kind": "symptom", "frequency": "frequent"},
+        {"name": "visual aura before headache", "kind": "symptom", "frequency": "occasional"}
+      ]
+    },
+    {
+      "id": "seed:multiple_sclerosis",
+      "name": "Multiple sclerosis",
+      "synonyms": ["ms", "multiple sclerosis"],
+      "prevalence_class": "1-5/10000",
+      "category": "neuro",
+      "description_md": "Autoimmune demyelination of the central nervous system, classically with neurological episodes separated in time and space.",
+      "source_url": "https://www.orpha.net/en/disease/detail/802",
+      "features": [
+        {"name": "vision loss in one eye optic neuritis", "kind": "symptom", "frequency": "frequent"},
+        {"name": "double vision", "kind": "symptom", "frequency": "frequent"},
+        {"name": "limb numbness", "kind": "symptom", "frequency": "frequent"},
+        {"name": "limb weakness", "kind": "symptom", "frequency": "frequent"},
+        {"name": "balance problems", "kind": "symptom", "frequency": "frequent"},
+        {"name": "fatigue", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "bladder urgency", "kind": "symptom", "frequency": "frequent"},
+        {"name": "lhermitte sign electric shock down spine", "kind": "sign", "frequency": "occasional"}
+      ]
+    },
+    {
+      "id": "seed:behcet",
+      "name": "Behcet disease",
+      "synonyms": ["behcet", "behcets disease"],
+      "prevalence_class": "1-5/10000",
+      "category": "autoimmune",
+      "description_md": "Multisystem inflammatory disease with recurrent oral and genital ulcers, eye inflammation, and skin lesions.",
+      "source_url": "https://www.orpha.net/en/disease/detail/117",
+      "features": [
+        {"name": "recurrent oral ulcers", "kind": "symptom", "frequency": "obligate"},
+        {"name": "genital ulcers", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "uveitis red painful eye", "kind": "symptom", "frequency": "frequent"},
+        {"name": "skin pustules", "kind": "sign", "frequency": "frequent"},
+        {"name": "joint pain", "kind": "symptom", "frequency": "frequent"},
+        {"name": "erythema nodosum", "kind": "sign", "frequency": "occasional"},
+        {"name": "positive pathergy skin test", "kind": "sign", "frequency": "occasional"}
+      ]
+    },
+    {
+      "id": "seed:ankylosing_spondylitis",
+      "name": "Ankylosing spondylitis",
+      "synonyms": ["as", "axial spondyloarthritis"],
+      "prevalence_class": "1-5/1000",
+      "category": "autoimmune",
+      "description_md": "Chronic inflammatory arthritis of the spine and sacroiliac joints, often with extra-articular features.",
+      "source_url": "https://www.orpha.net/en/disease/detail/825",
+      "features": [
+        {"name": "lower back pain worse at rest", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "morning back stiffness lasting hours", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "back pain improves with exercise", "kind": "temporal", "frequency": "frequent"},
+        {"name": "hip pain", "kind": "symptom", "frequency": "frequent"},
+        {"name": "uveitis red painful eye", "kind": "symptom", "frequency": "frequent"},
+        {"name": "fatigue", "kind": "symptom", "frequency": "frequent"},
+        {"name": "elevated crp", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "hla b27 positive", "kind": "lab_pattern", "frequency": "very_frequent"}
+      ]
+    },
+    {
+      "id": "seed:ra",
+      "name": "Rheumatoid arthritis",
+      "synonyms": ["ra", "rheumatoid"],
+      "prevalence_class": "common",
+      "category": "autoimmune",
+      "description_md": "Symmetric inflammatory polyarthritis, typically of small joints of hands and feet, with morning stiffness and elevated inflammatory markers.",
+      "source_url": "https://medlineplus.gov/rheumatoidarthritis.html",
+      "features": [
+        {"name": "symmetric small joint pain hands feet", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "morning joint stiffness over one hour", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "joint swelling", "kind": "sign", "frequency": "very_frequent"},
+        {"name": "fatigue", "kind": "symptom", "frequency": "frequent"},
+        {"name": "elevated crp", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "elevated esr", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "rheumatoid factor positive", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "anti ccp positive", "kind": "lab_pattern", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:sjogren",
+      "name": "Sjogren syndrome",
+      "synonyms": ["sjogren"],
+      "prevalence_class": "1-5/10000",
+      "category": "autoimmune",
+      "description_md": "Autoimmune destruction of moisture-producing glands causing dry eyes and dry mouth, with possible systemic features.",
+      "source_url": "https://www.orpha.net/en/disease/detail/378",
+      "features": [
+        {"name": "dry eyes", "kind": "symptom", "frequency": "obligate"},
+        {"name": "dry mouth", "kind": "symptom", "frequency": "obligate"},
+        {"name": "fatigue", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "joint pain", "kind": "symptom", "frequency": "frequent"},
+        {"name": "swollen salivary glands", "kind": "sign", "frequency": "occasional"},
+        {"name": "anti ssa ssb antibodies", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "positive ana antinuclear antibody", "kind": "lab_pattern", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:t1d",
+      "name": "Type 1 diabetes mellitus",
+      "synonyms": ["t1d", "type 1 diabetes"],
+      "prevalence_class": "common",
+      "category": "endocrine",
+      "description_md": "Autoimmune destruction of pancreatic beta cells leading to insulin deficiency.",
+      "source_url": "https://medlineplus.gov/diabetestype1.html",
+      "red_flag": 1,
+      "features": [
+        {"name": "excessive thirst", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "frequent urination", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "weight loss despite eating", "kind": "symptom", "frequency": "frequent"},
+        {"name": "fatigue", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "blurry vision", "kind": "symptom", "frequency": "frequent"},
+        {"name": "elevated glucose", "kind": "lab_pattern", "frequency": "obligate"},
+        {"name": "elevated hba1c", "kind": "lab_pattern", "frequency": "obligate"},
+        {"name": "ketones in urine", "kind": "lab_pattern", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:addison",
+      "name": "Addison disease (primary adrenal insufficiency)",
+      "synonyms": ["addison", "adrenal insufficiency"],
+      "prevalence_class": "rare",
+      "category": "endocrine",
+      "description_md": "Insufficient cortisol production by the adrenal glands, often autoimmune. Untreated adrenal crisis is life-threatening.",
+      "source_url": "https://www.orpha.net/en/disease/detail/85138",
+      "red_flag": 1,
+      "features": [
+        {"name": "chronic fatigue", "kind": "symptom", "frequency": "obligate"},
+        {"name": "weight loss", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "hyperpigmentation of skin", "kind": "sign", "frequency": "very_frequent"},
+        {"name": "salt craving", "kind": "symptom", "frequency": "frequent"},
+        {"name": "low blood pressure on standing", "kind": "sign", "frequency": "very_frequent"},
+        {"name": "nausea vomiting", "kind": "symptom", "frequency": "frequent"},
+        {"name": "low sodium hyponatremia", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "high potassium hyperkalemia", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "low cortisol", "kind": "lab_pattern", "frequency": "obligate"}
+      ]
+    },
+    {
+      "id": "seed:cushing",
+      "name": "Cushing syndrome",
+      "synonyms": ["cushing"],
+      "prevalence_class": "rare",
+      "category": "endocrine",
+      "description_md": "Chronic elevated cortisol producing characteristic somatic and metabolic features.",
+      "source_url": "https://www.orpha.net/en/disease/detail/553",
+      "features": [
+        {"name": "central weight gain", "kind": "sign", "frequency": "very_frequent"},
+        {"name": "moon face", "kind": "sign", "frequency": "frequent"},
+        {"name": "purple striae on abdomen", "kind": "sign", "frequency": "frequent"},
+        {"name": "easy bruising", "kind": "sign", "frequency": "frequent"},
+        {"name": "muscle weakness proximal", "kind": "symptom", "frequency": "frequent"},
+        {"name": "high blood pressure", "kind": "sign", "frequency": "frequent"},
+        {"name": "elevated glucose", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "elevated cortisol", "kind": "lab_pattern", "frequency": "very_frequent"}
+      ]
+    },
+    {
+      "id": "seed:pheochromocytoma",
+      "name": "Pheochromocytoma",
+      "synonyms": ["pheochromocytoma", "pheo"],
+      "prevalence_class": "rare",
+      "category": "endocrine",
+      "description_md": "Catecholamine-secreting tumor of the adrenal medulla causing paroxysmal hypertension and dramatic adrenergic episodes.",
+      "source_url": "https://www.orpha.net/en/disease/detail/717",
+      "red_flag": 1,
+      "features": [
+        {"name": "paroxysmal severe headache", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "rapid heartbeat episodes", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "drenching sweats", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "high blood pressure", "kind": "sign", "frequency": "very_frequent"},
+        {"name": "anxiety attacks", "kind": "symptom", "frequency": "frequent"},
+        {"name": "weight loss", "kind": "symptom", "frequency": "frequent"},
+        {"name": "elevated plasma metanephrines", "kind": "lab_pattern", "frequency": "obligate"}
+      ]
+    },
+    {
+      "id": "seed:b12_deficiency",
+      "name": "Vitamin B12 deficiency",
+      "synonyms": ["b12 deficiency", "cobalamin deficiency", "pernicious anemia"],
+      "prevalence_class": "common",
+      "category": "metabolic",
+      "description_md": "Inadequate B12 from autoimmune (pernicious anemia), dietary, or absorption causes — produces hematologic and neurologic features.",
+      "source_url": "https://medlineplus.gov/vitaminb12deficiencyanemia.html",
+      "features": [
+        {"name": "fatigue", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "tingling numbness in feet hands", "kind": "symptom", "frequency": "frequent"},
+        {"name": "balance problems", "kind": "symptom", "frequency": "frequent"},
+        {"name": "sore tongue glossitis", "kind": "sign", "frequency": "occasional"},
+        {"name": "pallor", "kind": "sign", "frequency": "frequent"},
+        {"name": "low vitamin b12", "kind": "lab_pattern", "frequency": "obligate"},
+        {"name": "macrocytic anemia high mcv", "kind": "lab_pattern", "frequency": "very_frequent"}
+      ]
+    },
+    {
+      "id": "seed:iron_deficiency",
+      "name": "Iron deficiency anemia",
+      "synonyms": ["iron deficiency", "iron deficiency anemia"],
+      "prevalence_class": "common",
+      "category": "hematology",
+      "description_md": "Most common cause of anemia worldwide, frequently from chronic blood loss or malabsorption.",
+      "source_url": "https://medlineplus.gov/anemia.html",
+      "features": [
+        {"name": "fatigue", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "pallor", "kind": "sign", "frequency": "frequent"},
+        {"name": "shortness of breath on exertion", "kind": "symptom", "frequency": "frequent"},
+        {"name": "ice craving pica", "kind": "symptom", "frequency": "occasional"},
+        {"name": "restless legs", "kind": "symptom", "frequency": "frequent"},
+        {"name": "low hemoglobin", "kind": "lab_pattern", "frequency": "obligate"},
+        {"name": "low ferritin", "kind": "lab_pattern", "frequency": "very_frequent"},
+        {"name": "microcytic anemia low mcv", "kind": "lab_pattern", "frequency": "very_frequent"}
+      ]
+    },
+    {
+      "id": "seed:hemochromatosis",
+      "name": "Hereditary hemochromatosis",
+      "synonyms": ["hemochromatosis", "iron overload"],
+      "prevalence_class": "1/300",
+      "category": "metabolic",
+      "description_md": "Inherited iron-overload disorder causing organ damage from accumulated iron, often presenting with fatigue, joint pain, and bronze skin.",
+      "source_url": "https://www.orpha.net/en/disease/detail/465",
+      "features": [
+        {"name": "fatigue", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "joint pain especially second third knuckles", "kind": "symptom", "frequency": "frequent"},
+        {"name": "bronze gray skin pigmentation", "kind": "sign", "frequency": "frequent"},
+        {"name": "loss of libido", "kind": "symptom", "frequency": "frequent"},
+        {"name": "high ferritin", "kind": "lab_pattern", "frequency": "obligate"},
+        {"name": "high transferrin saturation", "kind": "lab_pattern", "frequency": "very_frequent"},
+        {"name": "elevated liver enzymes", "kind": "lab_pattern", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:wilson",
+      "name": "Wilson disease",
+      "synonyms": ["wilson"],
+      "prevalence_class": "1/30000",
+      "category": "metabolic",
+      "description_md": "Autosomal-recessive copper accumulation disorder presenting with liver disease and/or movement and psychiatric symptoms in young adults.",
+      "source_url": "https://www.orpha.net/en/disease/detail/905",
+      "features": [
+        {"name": "elevated liver enzymes", "kind": "lab_pattern", "frequency": "very_frequent"},
+        {"name": "tremor", "kind": "symptom", "frequency": "frequent"},
+        {"name": "speech difficulty", "kind": "symptom", "frequency": "frequent"},
+        {"name": "personality change irritability", "kind": "symptom", "frequency": "frequent"},
+        {"name": "kayser fleischer rings on cornea", "kind": "sign", "frequency": "frequent"},
+        {"name": "low ceruloplasmin", "kind": "lab_pattern", "frequency": "very_frequent"},
+        {"name": "high urinary copper", "kind": "lab_pattern", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:porphyria_aip",
+      "name": "Acute intermittent porphyria",
+      "synonyms": ["aip", "acute intermittent porphyria"],
+      "prevalence_class": "rare",
+      "category": "metabolic",
+      "description_md": "Heme-biosynthesis disorder causing recurrent attacks of severe abdominal pain, neurologic symptoms, and dark urine.",
+      "source_url": "https://www.orpha.net/en/disease/detail/79276",
+      "features": [
+        {"name": "severe acute abdominal pain attacks", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "dark red brown urine", "kind": "sign", "frequency": "very_frequent"},
+        {"name": "limb weakness during attack", "kind": "symptom", "frequency": "frequent"},
+        {"name": "anxiety confusion", "kind": "symptom", "frequency": "frequent"},
+        {"name": "nausea vomiting", "kind": "symptom", "frequency": "frequent"},
+        {"name": "rapid heartbeat during attack", "kind": "symptom", "frequency": "frequent"},
+        {"name": "high blood pressure during attack", "kind": "sign", "frequency": "frequent"},
+        {"name": "elevated urine porphobilinogen", "kind": "lab_pattern", "frequency": "obligate"}
+      ]
+    },
+    {
+      "id": "seed:fmf",
+      "name": "Familial Mediterranean fever",
+      "synonyms": ["fmf", "familial mediterranean fever"],
+      "prevalence_class": "1-5/10000",
+      "category": "autoinflammatory",
+      "description_md": "Autoinflammatory disease with recurrent short fevers, sterile peritonitis, pleuritis, and arthritis, common in Mediterranean ancestry.",
+      "source_url": "https://www.orpha.net/en/disease/detail/342",
+      "features": [
+        {"name": "recurrent fever attacks 1 to 3 days", "kind": "temporal", "frequency": "obligate"},
+        {"name": "abdominal pain attacks", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "chest pain pleuritic", "kind": "symptom", "frequency": "frequent"},
+        {"name": "joint pain attacks", "kind": "symptom", "frequency": "frequent"},
+        {"name": "rash on lower legs erysipelas like", "kind": "sign", "frequency": "occasional"},
+        {"name": "elevated crp during attack", "kind": "lab_pattern", "frequency": "very_frequent"},
+        {"name": "mefv mutation", "kind": "lab_pattern", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:pfapa",
+      "name": "PFAPA syndrome",
+      "synonyms": ["pfapa", "marshall syndrome"],
+      "prevalence_class": "rare_pediatric",
+      "category": "autoinflammatory",
+      "description_md": "Periodic Fever, Aphthous stomatitis, Pharyngitis, cervical Adenitis. Most common periodic-fever syndrome in children.",
+      "source_url": "https://www.orpha.net/en/disease/detail/42642",
+      "features": [
+        {"name": "recurrent fever every 3 to 6 weeks in child", "kind": "temporal", "frequency": "obligate"},
+        {"name": "aphthous mouth ulcers during fever", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "pharyngitis sore throat during fever", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "cervical lymph node enlargement during fever", "kind": "sign", "frequency": "very_frequent"},
+        {"name": "well between attacks", "kind": "temporal", "frequency": "obligate"}
+      ]
+    },
+    {
+      "id": "seed:narcolepsy",
+      "name": "Narcolepsy",
+      "synonyms": ["narcolepsy"],
+      "prevalence_class": "1-5/10000",
+      "category": "neuro",
+      "description_md": "Chronic neurological sleep disorder with overwhelming daytime sleepiness and disrupted REM regulation.",
+      "source_url": "https://www.orpha.net/en/disease/detail/2073",
+      "features": [
+        {"name": "excessive daytime sleepiness", "kind": "symptom", "frequency": "obligate"},
+        {"name": "sudden muscle weakness with emotion cataplexy", "kind": "symptom", "frequency": "frequent"},
+        {"name": "sleep paralysis", "kind": "symptom", "frequency": "frequent"},
+        {"name": "hypnagogic hallucinations", "kind": "symptom", "frequency": "frequent"},
+        {"name": "fragmented night sleep", "kind": "symptom", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:pcos",
+      "name": "Polycystic ovary syndrome",
+      "synonyms": ["pcos"],
+      "prevalence_class": "common",
+      "category": "endocrine",
+      "description_md": "Hyperandrogenic anovulatory disorder of reproductive-age women, frequently with insulin resistance and metabolic features.",
+      "source_url": "https://medlineplus.gov/polycysticovarysyndrome.html",
+      "features": [
+        {"name": "irregular menstrual cycles", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "acne", "kind": "sign", "frequency": "frequent"},
+        {"name": "excess facial body hair hirsutism", "kind": "sign", "frequency": "frequent"},
+        {"name": "weight gain", "kind": "symptom", "frequency": "frequent"},
+        {"name": "hair thinning on scalp", "kind": "sign", "frequency": "frequent"},
+        {"name": "insulin resistance", "kind": "lab_pattern", "frequency": "frequent"},
+        {"name": "elevated testosterone", "kind": "lab_pattern", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:endometriosis",
+      "name": "Endometriosis",
+      "synonyms": ["endometriosis"],
+      "prevalence_class": "common",
+      "category": "gynecologic",
+      "description_md": "Endometrial-like tissue outside the uterus causing chronic pelvic pain, painful periods, and infertility.",
+      "source_url": "https://www.orpha.net/en/disease/detail/124",
+      "features": [
+        {"name": "severe menstrual cramps dysmenorrhea", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "chronic pelvic pain", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "pain with intercourse", "kind": "symptom", "frequency": "frequent"},
+        {"name": "heavy menstrual bleeding", "kind": "symptom", "frequency": "frequent"},
+        {"name": "infertility", "kind": "symptom", "frequency": "frequent"},
+        {"name": "fatigue", "kind": "symptom", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:gallstones",
+      "name": "Gallstones (cholelithiasis)",
+      "synonyms": ["gallstones", "cholelithiasis", "biliary colic"],
+      "prevalence_class": "common",
+      "category": "gi",
+      "description_md": "Crystallized bile components in the gallbladder causing episodic right-upper-quadrant pain after fatty meals.",
+      "source_url": "https://medlineplus.gov/gallstones.html",
+      "features": [
+        {"name": "right upper quadrant pain after fatty meal", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "nausea after fatty meal", "kind": "symptom", "frequency": "frequent"},
+        {"name": "back pain right shoulder blade", "kind": "symptom", "frequency": "frequent"},
+        {"name": "fever and jaundice cholangitis", "kind": "symptom", "frequency": "occasional"}
+      ]
+    },
+    {
+      "id": "seed:gerd",
+      "name": "Gastroesophageal reflux disease",
+      "synonyms": ["gerd", "reflux"],
+      "prevalence_class": "common",
+      "category": "gi",
+      "description_md": "Recurrent reflux of stomach contents into the esophagus causing heartburn, regurgitation, and sometimes extra-esophageal symptoms.",
+      "source_url": "https://medlineplus.gov/gerd.html",
+      "features": [
+        {"name": "heartburn after meals", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "regurgitation acid taste", "kind": "symptom", "frequency": "frequent"},
+        {"name": "chronic cough especially at night", "kind": "symptom", "frequency": "frequent"},
+        {"name": "hoarseness in morning", "kind": "symptom", "frequency": "frequent"},
+        {"name": "symptoms worse lying down", "kind": "temporal", "frequency": "very_frequent"}
+      ]
+    },
+    {
+      "id": "seed:gastroparesis",
+      "name": "Gastroparesis",
+      "synonyms": ["gastroparesis", "delayed gastric emptying"],
+      "prevalence_class": "rare",
+      "category": "gi",
+      "description_md": "Delayed stomach emptying without mechanical obstruction, often from autonomic dysfunction or diabetes.",
+      "source_url": "https://medlineplus.gov/ency/article/000297.htm",
+      "features": [
+        {"name": "early satiety small meals", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "nausea after eating", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "bloating after eating", "kind": "symptom", "frequency": "frequent"},
+        {"name": "vomiting undigested food hours after meal", "kind": "symptom", "frequency": "frequent"},
+        {"name": "weight loss", "kind": "symptom", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:lyme",
+      "name": "Lyme disease",
+      "synonyms": ["lyme", "borreliosis"],
+      "prevalence_class": "common_in_endemic_areas",
+      "category": "infectious",
+      "description_md": "Tick-borne Borrelia infection with characteristic expanding rash and possible later joint, neurologic, and cardiac involvement.",
+      "source_url": "https://medlineplus.gov/lymedisease.html",
+      "features": [
+        {"name": "expanding red bullseye rash erythema migrans", "kind": "sign", "frequency": "very_frequent"},
+        {"name": "tick bite history outdoors", "kind": "temporal", "frequency": "frequent"},
+        {"name": "fever after tick exposure", "kind": "symptom", "frequency": "frequent"},
+        {"name": "fatigue", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "joint pain knees", "kind": "symptom", "frequency": "frequent"},
+        {"name": "facial nerve weakness bell palsy", "kind": "symptom", "frequency": "occasional"},
+        {"name": "elevated lyme antibodies", "kind": "lab_pattern", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:sleep_apnea",
+      "name": "Obstructive sleep apnea",
+      "synonyms": ["osa", "sleep apnea"],
+      "prevalence_class": "common",
+      "category": "sleep",
+      "description_md": "Recurrent upper airway collapse during sleep producing daytime sleepiness, witnessed apneas, and cardiometabolic risk.",
+      "source_url": "https://medlineplus.gov/sleepapnea.html",
+      "features": [
+        {"name": "loud snoring", "kind": "sign", "frequency": "very_frequent"},
+        {"name": "witnessed pauses in breathing during sleep", "kind": "sign", "frequency": "frequent"},
+        {"name": "excessive daytime sleepiness", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "morning headache", "kind": "symptom", "frequency": "frequent"},
+        {"name": "high blood pressure", "kind": "sign", "frequency": "frequent"},
+        {"name": "frequent night urination", "kind": "symptom", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:depression",
+      "name": "Major depressive disorder",
+      "synonyms": ["depression", "major depression"],
+      "prevalence_class": "common",
+      "category": "psychiatric",
+      "description_md": "Persistent low mood with anhedonia, sleep/appetite changes, and impaired function.",
+      "source_url": "https://medlineplus.gov/depression.html",
+      "features": [
+        {"name": "low mood most of day", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "loss of interest in activities", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "fatigue", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "sleep disturbance insomnia or hypersomnia", "kind": "symptom", "frequency": "frequent"},
+        {"name": "appetite change", "kind": "symptom", "frequency": "frequent"},
+        {"name": "difficulty concentrating brain fog", "kind": "symptom", "frequency": "frequent"},
+        {"name": "feelings of guilt or worthlessness", "kind": "symptom", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:anxiety_gad",
+      "name": "Generalized anxiety disorder",
+      "synonyms": ["gad", "anxiety"],
+      "prevalence_class": "common",
+      "category": "psychiatric",
+      "description_md": "Chronic excessive worry across multiple domains with somatic symptoms.",
+      "source_url": "https://medlineplus.gov/anxiety.html",
+      "features": [
+        {"name": "constant worry about everyday events", "kind": "symptom", "frequency": "obligate"},
+        {"name": "restlessness on edge", "kind": "symptom", "frequency": "frequent"},
+        {"name": "difficulty concentrating", "kind": "symptom", "frequency": "frequent"},
+        {"name": "muscle tension", "kind": "symptom", "frequency": "frequent"},
+        {"name": "sleep disturbance", "kind": "symptom", "frequency": "frequent"},
+        {"name": "irritability", "kind": "symptom", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:fnd",
+      "name": "Functional neurologic disorder",
+      "synonyms": ["fnd", "functional neurologic"],
+      "prevalence_class": "common",
+      "category": "neuro",
+      "description_md": "Genuine neurological symptoms (weakness, tremor, non-epileptic seizures, sensory loss) inconsistent with structural disease.",
+      "source_url": "https://www.orpha.net/en/disease/detail/300359",
+      "features": [
+        {"name": "limb weakness inconsistent on exam", "kind": "symptom", "frequency": "frequent"},
+        {"name": "tremor varying with attention", "kind": "symptom", "frequency": "frequent"},
+        {"name": "non epileptic seizure like episodes", "kind": "symptom", "frequency": "occasional"},
+        {"name": "sensory loss not following anatomic pattern", "kind": "symptom", "frequency": "frequent"},
+        {"name": "symptoms worse with stress", "kind": "temporal", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:long_covid",
+      "name": "Post COVID-19 condition (long COVID)",
+      "synonyms": ["long covid", "post covid syndrome"],
+      "prevalence_class": "common",
+      "category": "post_infectious",
+      "description_md": "Persistent symptoms more than 3 months after acute COVID-19 infection, often dysautonomic and cognitive.",
+      "source_url": "https://medlineplus.gov/longcovid.html",
+      "features": [
+        {"name": "fatigue after covid infection", "kind": "temporal", "frequency": "very_frequent"},
+        {"name": "post exertional malaise", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "brain fog", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "rapid heartbeat on standing", "kind": "symptom", "frequency": "frequent"},
+        {"name": "shortness of breath on exertion", "kind": "symptom", "frequency": "frequent"},
+        {"name": "sleep disturbance", "kind": "symptom", "frequency": "frequent"},
+        {"name": "loss of smell or taste", "kind": "symptom", "frequency": "frequent"}
+      ]
+    },
+    {
+      "id": "seed:hypoglycemia",
+      "name": "Reactive hypoglycemia",
+      "synonyms": ["reactive hypoglycemia", "postprandial hypoglycemia"],
+      "prevalence_class": "uncommon",
+      "category": "metabolic",
+      "description_md": "Symptomatic low blood glucose 2-4 hours after a meal, with adrenergic and neuroglycopenic features.",
+      "source_url": "https://medlineplus.gov/hypoglycemia.html",
+      "features": [
+        {"name": "shakiness 2 to 4 hours after meal", "kind": "temporal", "frequency": "very_frequent"},
+        {"name": "drenching sweats", "kind": "symptom", "frequency": "frequent"},
+        {"name": "rapid heartbeat episodes", "kind": "symptom", "frequency": "frequent"},
+        {"name": "lightheadedness", "kind": "symptom", "frequency": "frequent"},
+        {"name": "intense hunger", "kind": "symptom", "frequency": "frequent"},
+        {"name": "low glucose during episode", "kind": "lab_pattern", "frequency": "very_frequent"}
+      ]
+    },
+    {
+      "id": "seed:sarcoidosis",
+      "name": "Sarcoidosis",
+      "synonyms": ["sarcoidosis"],
+      "prevalence_class": "1-5/10000",
+      "category": "autoimmune",
+      "description_md": "Multisystem granulomatous disease, classically pulmonary, but with skin, eye, joint, and cardiac involvement.",
+      "source_url": "https://www.orpha.net/en/disease/detail/797",
+      "features": [
+        {"name": "chronic dry cough", "kind": "symptom", "frequency": "frequent"},
+        {"name": "shortness of breath on exertion", "kind": "symptom", "frequency": "frequent"},
+        {"name": "fatigue", "kind": "symptom", "frequency": "very_frequent"},
+        {"name": "joint pain ankles", "kind": "symptom", "frequency": "frequent"},
+        {"name": "erythema nodosum", "kind": "sign", "frequency": "frequent"},
+        {"name": "uveitis red painful eye", "kind": "symptom", "frequency": "frequent"},
+        {"name": "elevated calcium hypercalcemia", "kind": "lab_pattern", "frequency": "occasional"},
+        {"name": "elevated ace level", "kind": "lab_pattern", "frequency": "frequent"}
+      ]
+    }
+  ]
+}

@@ -10,6 +10,9 @@ import GraphPage from "./pages/GraphPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import LabsPage from "./pages/LabsPage";
 import MedicationsPage from "./pages/MedicationsPage";
+import HypothesesPage from "./pages/HypothesesPage";
+import InsightsPage from "./pages/InsightsPage";
+import SafetyBanner from "./components/SafetyBanner";
 
 export default function App() {
   const status = useQuery({
@@ -27,6 +30,17 @@ export default function App() {
 
   const { setup, unlocked } = status.data;
 
+  return (
+    <div className="h-full flex flex-col">
+      {unlocked && <SafetyBanner />}
+      <div className="flex-1 min-h-0">
+        <AppRoutes setup={setup} unlocked={unlocked} />
+      </div>
+    </div>
+  );
+}
+
+function AppRoutes({ setup, unlocked }: { setup: boolean; unlocked: boolean }) {
   return (
     <Routes>
       <Route
@@ -79,6 +93,18 @@ export default function App() {
         path="/medications"
         element={
           !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : <MedicationsPage />
+        }
+      />
+      <Route
+        path="/hypotheses"
+        element={
+          !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : <HypothesesPage />
+        }
+      />
+      <Route
+        path="/insights"
+        element={
+          !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : <InsightsPage />
         }
       />
       <Route path="*" element={<Navigate to="/" />} />

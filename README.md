@@ -4,7 +4,7 @@ A local, multimodal symptom diary with graph visualization and a background hypo
 
 ## Status
 
-**MVP-2** — encrypted local journal + Ollama-driven entity extraction + graph + multimodal capture (photos, audio, medical documents). The full roadmap lives in `../symptom-diary-plan (1).md`.
+**MVP-3** — encrypted local journal + Ollama-driven entity extraction + graph + multimodal capture + **Hypothesis Engine** + **clinician brief** + curated synthetic patients. The full roadmap lives in `../symptom-diary-plan (1).md`.
 
 ## What works today
 
@@ -34,6 +34,22 @@ A local, multimodal symptom diary with graph visualization and a background hypo
   high/low/in-range flags
 - **Medications page** (`/medications`) — every prescription extracted from any
   document, sorted by date
+- **Hypothesis Engine** (`/hypotheses`) — curated KB of ~40 common + rare disease
+  profiles (`backend/diary/data/diseases_seed.json`). Engine builds a "user
+  fingerprint" from active entities + abnormal labs, vector-matches against
+  disease features, aggregates by frequency-class weight, and writes hedged
+  rationales. Three-tier signal pills (weak / moderate / strong), explicit
+  citations to journal entries / labs / meds, dismiss / confirm / reactivate,
+  graceful fallback when Ollama is unavailable (templated rationale + Jaccard
+  matching).
+- **Clinician brief** (`/insights`) — markdown + printable HTML version with
+  episodes, top entities, abnormal labs, medications, and "Patterns AI noticed
+  for clinician's consideration" block.
+- **Synthetic reference patients** (`POST /api/demo/load`) — Maria (8mo SLE
+  picture), Tom (6mo MCAS picture), Anna (5mo Hashimoto picture). Pre-loaded
+  diary text, lab results, prescriptions. One-click loadable from the timeline.
+- **Persistent safety banner** restating "not a diagnosis, discuss with a
+  clinician" on every screen.
 - React + Vite + i18n (English; RU/IT slots ready)
 
 ## Prerequisites
@@ -123,7 +139,7 @@ There is **no recovery**. If you lose the passphrase, the data is gone.
 ```bash
 cd backend
 .venv/bin/pytest -q
-# 23 passed
+# 28 passed
 ```
 
 ## Smoke checklist (manual UI test)
@@ -180,6 +196,25 @@ symptom-diary/
         └── pages/{Setup, Unlock, Timeline, Tags}.tsx
 ```
 
+## Demo
+
+Easiest way to see the Hypothesis Engine working without any data of your own:
+
+1. Set up the journal (Setup screen) — any 12+ char passphrase.
+2. Open `/llm` and pull `gemma3:4b` (or another vision-capable Gemma) +
+   `nomic-embed-text`. Skipping this still works, but the engine falls back
+   to keyword Jaccard and produces fewer / weaker matches.
+3. Click **Load demo patient** in the Timeline header → pick Maria.
+4. Hit **Patterns** in the header (or `/hypotheses`) → click **Re-check now**.
+
+Maria should produce moderate signals for Systemic Lupus Erythematosus and
+Iron-deficiency anemia, with citations back into her diary and lab results.
+
 ## Roadmap
 
-See `../symptom-diary-plan (1).md`. Next phase is MVP-3: brief PDF for clinicians, Hypothesis Engine, ask-anything.
+See `../symptom-diary-plan (1).md`. Next phases:
+- **Unsloth fine-tune** (parallel sponsor track) — entity extraction LoRA + document
+  extraction LoRA on Orphanet/PMC pairs.
+- **MVP-4** — encrypted bundle export, QR-bridge for in-clinic sharing, real
+  Orphanet XML sync to grow the curated KB beyond ~40 conditions.
+- **Polish** — PyInstaller .exe, Tauri shell, code-signing.

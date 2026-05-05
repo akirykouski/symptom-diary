@@ -7,6 +7,7 @@ import { api } from "../api/client";
 import EntryEditor from "../components/EntryEditor";
 import type { EntryDraft } from "../components/EntryEditor";
 import TimelineView from "../components/TimelineView";
+import DemoMenu from "../components/DemoMenu";
 
 type EditState =
   | { mode: "closed" }
@@ -106,6 +107,16 @@ export default function Timeline() {
           <Link to="/graph" className="text-sm text-ink/60 hover:text-ink">
             {t("nav.graph")}
           </Link>
+          <Link
+            to="/hypotheses"
+            className="text-sm text-amber-300 hover:text-amber-200"
+            title={t("nav.hypothesesHint")}
+          >
+            ✦ {t("nav.hypotheses")}
+          </Link>
+          <Link to="/insights" className="text-sm text-ink/60 hover:text-ink">
+            {t("nav.brief")}
+          </Link>
           <Link to="/documents" className="text-sm text-ink/60 hover:text-ink">
             {t("nav.documents")}
           </Link>
@@ -121,6 +132,7 @@ export default function Timeline() {
           <Link to="/tags" className="text-sm text-ink/60 hover:text-ink">
             {t("timeline.tags")}
           </Link>
+          <DemoMenu entryCount={(entries.data ?? []).length} />
           <button
             onClick={() => setEdit({ mode: "create" })}
             className="bg-accent hover:bg-accent/90 px-3 py-1.5 rounded-md text-sm font-medium"

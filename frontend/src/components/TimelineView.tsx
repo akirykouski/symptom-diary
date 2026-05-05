@@ -8,12 +8,19 @@ interface Props {
   onSelect: (id: string) => void;
 }
 
+interface VisItem {
+  id: string;
+  content: string;
+  start: Date;
+  title?: string;
+  className?: string;
+  style?: string;
+}
+
 export default function TimelineView({ entries, onSelect }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<Timeline | null>(null);
-  const itemsRef = useRef<DataSet<{ id: string; content: string; start: Date; title?: string }>>(
-    new DataSet(),
-  );
+  const itemsRef = useRef<DataSet<VisItem>>(new DataSet());
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
 
@@ -39,11 +46,13 @@ export default function TimelineView({ entries, onSelect }: Props) {
   }, []);
 
   useEffect(() => {
-    const items = entries.map((e) => ({
+    const items: VisItem[] = entries.map((e) => ({
       id: e.id,
       content: shorten(e.text_md),
       start: new Date(e.ts_event),
       title: buildTitle(e),
+      className: severityClass(e.severity),
+      style: tagStyle(e),
     }));
     itemsRef.current.clear();
     itemsRef.current.add(items);
@@ -52,7 +61,19 @@ export default function TimelineView({ entries, onSelect }: Props) {
     }
   }, [entries]);
 
-  return <div ref={containerRef} className="h-full" />;
+  return <div ref={containerRef} className="h-full timeline-pretty" />;
+}
+
+function severityClass(sev: number | null | undefined): string {
+  if (sev == null) return "vis-sev-none";
+  if (sev >= 7) return "vis-sev-high";
+  if (sev >= 4) return "vis-sev-mid";
+  return "vis-sev-low";
+}
+
+function tagStyle(e: Entry): string | undefined {
+  const c = e.tags.find((t) => t.color)?.color;
+  return c ? `border-left: 3px solid ${c};` : undefined;
 }
 
 function shorten(text: string): string {

@@ -8,13 +8,15 @@ import type { GraphNode } from "../api/client";
 import EntityPanel from "../components/EntityPanel";
 
 const TYPE_COLORS: Record<string, string> = {
-  symptom: "#ef4444",
-  trigger: "#f59e0b",
-  bodypart: "#3b82f6",
-  med: "#a855f7",
-  food: "#22c55e",
-  activity: "#06b6d4",
-  emotion: "#ec4899",
+  symptom: "#fb7185",   // rose
+  trigger: "#fbbf24",   // amber
+  bodypart: "#60a5fa",  // sky blue
+  med: "#c084fc",       // violet
+  food: "#4ade80",      // green
+  activity: "#22d3ee",  // cyan
+  emotion: "#f472b6",   // pink
+  sign: "#fb923c",      // orange (for medical signs from documents)
+  lab_pattern: "#a3e635", // lime
   other: "#94a3b8",
 };
 
@@ -101,26 +103,38 @@ export default function GraphPage() {
             graphData={data}
             width={size.w}
             height={size.h}
-            backgroundColor="#0c0c10"
-            nodeRelSize={4}
-            nodeVal={(n: GraphNode) => Math.min(20, 4 + (n.mention_count ?? 1))}
+            backgroundColor="#070710"
+            nodeRelSize={5}
+            nodeVal={(n: GraphNode) =>
+              Math.min(28, 4 + Math.pow(n.mention_count ?? 1, 1.4))
+            }
             nodeColor={(n: GraphNode) => TYPE_COLORS[n.type] ?? "#94a3b8"}
             nodeLabel={(n: GraphNode) =>
-              `${n.name} (${n.type}, ${n.mention_count ?? 0})`
+              `${n.name} · ${n.type} · ${n.mention_count ?? 0} mention${
+                (n.mention_count ?? 0) === 1 ? "" : "s"
+              }`
             }
-            linkColor={(l) =>
-              (l as { kind: string }).kind === "precedes"
-                ? "rgba(124,92,255,0.5)"
-                : "rgba(255,255,255,0.18)"
-            }
+            linkColor={(l) => {
+              const w = (l as { weight: number }).weight;
+              const opacity = Math.min(0.55, 0.12 + w / 18);
+              return (l as { kind: string }).kind === "precedes"
+                ? `rgba(160,140,255,${opacity})`
+                : `rgba(255,255,255,${opacity})`;
+            }}
             linkWidth={(l) =>
-              Math.min(3, 0.5 + Math.log2(1 + (l as { weight: number }).weight))
+              Math.min(4, 0.6 + Math.log2(1 + (l as { weight: number }).weight))
             }
             linkDirectionalArrowLength={(l) =>
               (l as { kind: string }).kind === "precedes" ? 4 : 0
             }
             linkDirectionalArrowRelPos={1}
-            cooldownTicks={120}
+            linkDirectionalParticles={(l) =>
+              (l as { weight: number }).weight >= 3 ? 2 : 0
+            }
+            linkDirectionalParticleWidth={2}
+            linkDirectionalParticleSpeed={0.005}
+            cooldownTicks={150}
+            d3VelocityDecay={0.3}
             onNodeClick={(n) => {
               const node = n as GraphNode;
               setSelected(node.id);
@@ -129,13 +143,28 @@ export default function GraphPage() {
             nodeCanvasObjectMode={() => "after"}
             nodeCanvasObject={(n, ctx, globalScale) => {
               const node = n as GraphNode & { x?: number; y?: number };
-              if (!node.x || !node.y) return;
-              const fontSize = 11 / globalScale;
-              ctx.font = `${fontSize}px ui-sans-serif, system-ui`;
-              ctx.fillStyle = "rgba(232,232,238,0.85)";
+              if (node.x == null || node.y == null) return;
+              const isHub = (node.mention_count ?? 0) >= 3;
+              const fontSize = (isHub ? 12 : 10) / globalScale;
+              const radius =
+                Math.sqrt(Math.min(28, 4 + Math.pow(node.mention_count ?? 1, 1.4))) * 5;
+              ctx.font = `${isHub ? 600 : 400} ${fontSize}px ui-sans-serif, system-ui`;
+              const text = node.name;
+              const textWidth = ctx.measureText(text).width;
+              const padX = 4 / globalScale;
+              const padY = 2 / globalScale;
+              const ty = node.y + radius + 4 / globalScale;
+              ctx.fillStyle = "rgba(8,8,16,0.7)";
+              ctx.fillRect(
+                node.x - textWidth / 2 - padX,
+                ty,
+                textWidth + 2 * padX,
+                fontSize + 2 * padY,
+              );
+              ctx.fillStyle = isHub ? "#ffffff" : "rgba(232,232,238,0.82)";
               ctx.textAlign = "center";
               ctx.textBaseline = "top";
-              ctx.fillText(node.name, node.x, node.y + 6);
+              ctx.fillText(text, node.x, ty + padY);
             }}
           />
         </div>

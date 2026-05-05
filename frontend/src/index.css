@@ -25,8 +25,27 @@ body {
   background: #2a2a3f !important;
   border-color: #4a4a6a !important;
   color: #e8e8ee !important;
+  border-radius: 4px !important;
+  font-size: 12px !important;
 }
 .vis-item.vis-selected {
   background: #7c5cff !important;
   border-color: #7c5cff !important;
+}
+.vis-item.vis-sev-low {
+  background: rgba(74, 222, 128, 0.15) !important;
+  border-color: rgba(74, 222, 128, 0.55) !important;
+}
+.vis-item.vis-sev-mid {
+  background: rgba(251, 191, 36, 0.18) !important;
+  border-color: rgba(251, 191, 36, 0.6) !important;
+}
+.vis-item.vis-sev-high {
+  background: rgba(251, 113, 133, 0.22) !important;
+  border-color: rgba(251, 113, 133, 0.7) !important;
+  box-shadow: 0 0 12px rgba(251, 113, 133, 0.25);
+}
+.vis-item.vis-sev-none {
+  background: rgba(124, 92, 255, 0.10) !important;
+  border-color: rgba(124, 92, 255, 0.45) !important;
 }
