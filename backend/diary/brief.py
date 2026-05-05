@@ -369,6 +369,33 @@ _HTML_TEMPLATE = """<!doctype html>
 </body></html>"""
 
 
+def pdf_engine_available() -> bool:
+    """True when WeasyPrint can be imported. Cheap — only the import is tried.
+
+    We prefer `importlib.util.find_spec` so the import isn't actually executed
+    every time the route runs (WeasyPrint is slow to import).
+    """
+    import importlib.util
+
+    return importlib.util.find_spec("weasyprint") is not None
+
+
+def render_pdf(html_text: str) -> bytes:
+    """Render the printable HTML to PDF bytes via WeasyPrint.
+
+    Raises RuntimeError if WeasyPrint is not installed — call sites should
+    check `pdf_engine_available()` first or handle the exception by falling
+    back to the HTML download.
+    """
+    try:
+        from weasyprint import HTML  # type: ignore[import-not-found]
+    except ImportError as e:
+        raise RuntimeError(
+            "weasyprint is not installed; install with `pip install -e .[pdf]`"
+        ) from e
+    return HTML(string=html_text).write_pdf()
+
+
 def render_html(markdown_text: str) -> str:
     """Tiny markdown-ish → HTML conversion that handles only what render_markdown emits."""
     body_lines: list[str] = []

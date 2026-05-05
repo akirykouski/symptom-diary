@@ -4,7 +4,7 @@ A local, multimodal symptom diary with graph visualization and a background hypo
 
 ## Status
 
-**MVP-3** — encrypted local journal + Ollama-driven entity extraction + graph + multimodal capture + **Hypothesis Engine** + **clinician brief** + curated synthetic patients. The full roadmap lives in `../symptom-diary-plan (1).md`.
+**MVP-4** — encrypted local journal + Ollama-driven entity extraction + graph + multimodal capture + **Hypothesis Engine** + **clinician brief** (markdown + printable HTML + WeasyPrint PDF) + **Ask-anything Q&A with red-flag refusal layer** + **encrypted `.diary` bundle export/import** + **in-clinic QR share** + curated synthetic patients. The full roadmap lives in `../symptom-diary-plan (1).md`.
 
 ## What works today
 
@@ -42,9 +42,26 @@ A local, multimodal symptom diary with graph visualization and a background hypo
   citations to journal entries / labs / meds, dismiss / confirm / reactivate,
   graceful fallback when Ollama is unavailable (templated rationale + Jaccard
   matching).
-- **Clinician brief** (`/insights`) — markdown + printable HTML version with
-  episodes, top entities, abnormal labs, medications, and "Patterns AI noticed
-  for clinician's consideration" block.
+- **Clinician brief** (`/insights`) — markdown + printable HTML + downloadable
+  PDF (via optional WeasyPrint extra; gracefully falls back to a downloadable
+  HTML attachment when WeasyPrint isn't installed). Episodes, top entities,
+  abnormal labs, medications, and "Patterns AI noticed for clinician's
+  consideration" block.
+- **Ask-anything Q&A** (`/insights` → ask box) — every answer cites the
+  underlying journal entries as inline `[entry-<prefix>]` pills; a red-flag
+  refusal layer short-circuits prompts about dosing, self-harm, emergencies,
+  diagnostic certainty, or pregnancy + medication safety *before* the LLM is
+  called. Hedged-language and citation enforcement on the model output, with
+  a deterministic grounded-summary fallback when Ollama is unavailable or the
+  output fails the safety filter.
+- **Encrypted `.diary` bundle export/import** — single-file backup containing
+  the SQLCipher database, salt, manifest, and encrypted media tree. Bundle is
+  cryptographically opaque without the passphrase. Restore-from-bundle option
+  on the Setup screen.
+- **In-clinic QR share** — generate a one-time URL + QR code (5–30 min TTL,
+  read-only, scoped to the brief) so a clinician can scan it from a phone on
+  the same WiFi and view the brief in their own browser. Locking the journal
+  immediately invalidates active share links.
 - **Synthetic reference patients** (`POST /api/demo/load`) — Maria (8mo SLE
   picture), Tom (6mo MCAS picture), Anna (5mo Hashimoto picture). Pre-loaded
   diary text, lab results, prescriptions. One-click loadable from the timeline.
@@ -144,7 +161,7 @@ There is **no recovery**. If you lose the passphrase, the data is gone.
 ```bash
 cd backend
 .venv/bin/pytest -q
-# 36 passed
+# 86 passed
 ```
 
 ## Smoke checklist (manual UI test)
@@ -217,9 +234,9 @@ Iron-deficiency anemia, with citations back into her diary and lab results.
 
 ## Roadmap
 
-See `../symptom-diary-plan (1).md`. Next phases:
-- **Unsloth fine-tune** (parallel sponsor track) — entity extraction LoRA + document
-  extraction LoRA on Orphanet/PMC pairs.
-- **MVP-4** — encrypted bundle export, QR-bridge for in-clinic sharing, real
-  Orphanet XML sync to grow the curated KB beyond ~40 conditions.
+See `../symptom-diary-plan (1).md`. Remaining work:
+- **Unsloth fine-tune** (parallel sponsor track) — entity extraction LoRA +
+  document extraction LoRA on Orphanet/PMC pairs.
+- **Real Orphanet XML sync** to grow the curated KB beyond the ~40 seed
+  conditions.
 - **Polish** — PyInstaller .exe, Tauri shell, code-signing.

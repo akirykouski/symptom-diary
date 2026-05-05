@@ -150,6 +150,8 @@
     "generate": "Generate brief",
     "generating": "Generating…",
     "printable": "Open printable version",
+    "downloadPdf": "Download as PDF",
+    "pdfHint": "If WeasyPrint isn't installed, you'll get an HTML download you can browser-print to PDF.",
     "enrich": "Add AI summary paragraph",
     "disclaimer": "This brief is patient-reported context for clinical evaluation. Every assertion in it cites the underlying journal entry. It is not a diagnosis.",
     "stats": {
@@ -159,6 +161,60 @@
       "medications": "Medications",
       "hypotheses": "AI patterns"
     }
+  },
+  "qr": {
+    "openButton": "Show on doctor's phone (QR)",
+    "modalTitle": "QR share for in-clinic view",
+    "intro": "Have the clinician scan this code while their phone is on the same WiFi as this computer. The link is read-only and expires in {{minutes}} minutes.",
+    "createBtn": "Create share link",
+    "creating": "Creating…",
+    "ttlLabel": "Link valid for",
+    "ttlMinutes_one": "{{count}} minute",
+    "ttlMinutes_other": "{{count}} minutes",
+    "url": "URL",
+    "expiresIn": "Expires in {{seconds}}s",
+    "fetches": "Opened {{count}} time(s)",
+    "revoke": "Revoke now",
+    "revoking": "Revoking…",
+    "lanWarning": "We couldn't find a LAN IP — the QR resolves to the local machine only. The clinician's phone will need to share this device's network (USB tethering or hotspot).",
+    "noteLocked": "When you lock the journal the share link stops working immediately.",
+    "close": "Close"
+  },
+  "bundle": {
+    "exportHeading": "Export encrypted bundle",
+    "exportIntro": "Download a single `.diary` file containing the entire encrypted journal — database, media, salt. Anyone with the file still needs your passphrase to read it.",
+    "exportButton": "Download .diary bundle",
+    "exporting": "Preparing…",
+    "importHeading": "Restore from a .diary bundle",
+    "importIntro": "Already have a `.diary` file from another machine? Pick it here and enter the passphrase it was exported with. Imports are only allowed into a brand-new install.",
+    "importToggle": "Restore from a .diary bundle instead",
+    "importCancel": "Back to setup",
+    "importFile": "Bundle file",
+    "importPassphrase": "Passphrase used when the bundle was exported",
+    "importSubmit": "Restore",
+    "importing": "Restoring…",
+    "importDone": "Restored {{entries}} entries.",
+    "errorWrongPassphrase": "That passphrase doesn't open this bundle.",
+    "errorBadBundle": "That file isn't a valid Symptom Diary bundle."
+  },
+  "ask": {
+    "heading": "Ask about your journal",
+    "intro": "Pose a question grounded in what you've written. Each answer cites the journal entries it draws on. Stateless — every question runs against a fresh read of your data.",
+    "placeholder": "e.g. What patterns do you notice across my last month of entries?",
+    "submit": "Ask",
+    "submitting": "Thinking…",
+    "examples": "Try one of these",
+    "exampleList": [
+      "What patterns do you notice in my recent entries?",
+      "How often did I mention headaches last month?",
+      "What did I write about coffee triggers?",
+      "Summarise my last two weeks for a clinician."
+    ],
+    "answer": "Answer",
+    "citations": "Cited journal entries",
+    "fallbackBadge": "Deterministic fallback — local AI was unavailable or returned unsafe text",
+    "refusalBadge": "Safety refusal",
+    "errorGeneric": "Could not produce an answer. Try again."
   },
   "demo": {
     "button": "Load demo patient",

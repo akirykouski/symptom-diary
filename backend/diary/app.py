@@ -11,6 +11,7 @@ from . import ollama_setup
 from .config import DEV_FRONTEND_ORIGIN
 from .extraction import worker_loop
 from .routes.auth import router as auth_router
+from .routes.bundle import router as bundle_router
 from .routes.demo import router as demo_router
 from .routes.documents import router as documents_router
 from .routes.entities import router as entities_router
@@ -21,6 +22,7 @@ from .routes.insights import router as insights_router
 from .routes.llm import router as llm_router
 from .routes.media import router as media_router
 from .routes.ollama_admin import router as ollama_admin_router
+from .routes.share import router as share_router
 from .routes.tags import router as tags_router
 
 
@@ -62,6 +64,8 @@ app.include_router(hypotheses_router)
 app.include_router(insights_router)
 app.include_router(demo_router)
 app.include_router(ollama_admin_router)
+app.include_router(bundle_router)
+app.include_router(share_router)
 
 
 @app.get("/api/health")

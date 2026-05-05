@@ -245,6 +245,19 @@ export const api = {
     const suffix = q.toString();
     return suffix ? `/api/insights/brief.html?${suffix}` : "/api/insights/brief.html";
   },
+  briefPdfUrl: (params?: { from?: string; to?: string; enrich?: boolean }) => {
+    const q = new URLSearchParams();
+    if (params?.from) q.set("from", params.from);
+    if (params?.to) q.set("to", params.to);
+    if (params?.enrich) q.set("enrich", "true");
+    const suffix = q.toString();
+    return suffix ? `/api/insights/brief.pdf?${suffix}` : "/api/insights/brief.pdf";
+  },
+  askInsight: (body: { question: string; language?: string }) =>
+    request<AskResponse>("POST", "/api/insights/ask", {
+      question: body.question,
+      language: body.language ?? "en",
+    }),
 
   // demo
   listPersonas: () =>
@@ -259,6 +272,34 @@ export const api = {
     }>("POST", "/api/demo/load", { persona_id, overwrite }),
   activePersona: () =>
     request<{ persona_id: string | null }>("GET", "/api/demo/active"),
+
+  // QR share (in-clinic handoff)
+  createQrSession: (body: { scope?: "brief"; ttl_minutes?: number }) =>
+    request<QrSession>("POST", "/api/export/qr-session", {
+      scope: body.scope ?? "brief",
+      ttl_minutes: body.ttl_minutes ?? 10,
+    }),
+  listQrSessions: () =>
+    request<{ sessions: QrSessionSummary[] }>("GET", "/api/export/qr-sessions"),
+  revokeQrSession: (token: string) =>
+    request<void>("DELETE", `/api/export/qr-session/${encodeURIComponent(token)}`),
+
+  // bundle export / import
+  bundleExportUrl: () => "/api/bundle/export",
+  bundleImport: async (file: File, passphrase: string) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("passphrase", passphrase);
+    const r = await fetch("/api/bundle/import", {
+      method: "POST",
+      body: fd,
+      credentials: "include",
+    });
+    if (!r.ok) {
+      throw new ApiError(r.status, await r.text());
+    }
+    return (await r.json()) as { entries: number; media_files: number; schema_version: number };
+  },
 
   // ollama bootstrap
   ollamaSetup: () => request<OllamaSetupState>("GET", "/api/ollama/setup"),
@@ -464,6 +505,41 @@ export interface BriefStats {
   abnormal_labs: number;
   medications: number;
   hypotheses: number;
+}
+
+export interface AskCitation {
+  entry_id: string;
+  ts_event: string;
+  snippet: string;
+  prefix: string;
+}
+
+export interface AskRefusal {
+  category: string;
+  message: string;
+}
+
+export interface QrSessionSummary {
+  token: string;
+  scope: string;
+  created_at: string;
+  expires_at: string;
+  fetches: number;
+}
+
+export interface QrSession extends QrSessionSummary {
+  url: string;
+  qr_data_url: string;
+  lan_ok: boolean;
+  host: string;
+  port: number;
+}
+
+export interface AskResponse {
+  answer_md: string;
+  citations: AskCitation[];
+  refusal: AskRefusal | null;
+  used_fallback: boolean;
 }
 
 export interface OllamaSetupMethod {
