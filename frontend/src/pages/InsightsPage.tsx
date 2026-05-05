@@ -3,12 +3,14 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
 import { api, AskCitation, AskResponse } from "../api/client";
+import PairPhoneModal from "../components/PairPhoneModal";
 import QrShareModal from "../components/QrShareModal";
 
 export default function InsightsPage() {
   const { t } = useTranslation();
   const [enrich, setEnrich] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const [showPair, setShowPair] = useState(false);
 
   const generate = useMutation({
     mutationFn: () => api.generateBrief({ enrich }),
@@ -69,6 +71,13 @@ export default function InsightsPage() {
             >
               {t("qr.openButton")}
             </button>
+            <button
+              onClick={() => setShowPair(true)}
+              className="px-4 py-2 rounded-md border border-accent/40 hover:bg-accent/10 text-sm text-accent"
+              type="button"
+            >
+              {t("pair.openButton")}
+            </button>
             <label className="flex items-center gap-2 text-sm text-ink/65">
               <input
                 type="checkbox"
@@ -116,6 +125,7 @@ export default function InsightsPage() {
         </section>
       </main>
       {showQr && <QrShareModal onClose={() => setShowQr(false)} />}
+      {showPair && <PairPhoneModal onClose={() => setShowPair(false)} />}
     </div>
   );
 }

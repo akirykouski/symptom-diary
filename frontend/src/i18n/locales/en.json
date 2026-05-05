@@ -131,6 +131,11 @@
       "dismissed": "Dismissed",
       "confirmed": "Already evaluated"
     },
+    "suppressedHeading_one": "{{count}} pattern you dismissed earlier",
+    "suppressedHeading_other": "{{count}} patterns you dismissed earlier",
+    "corroborateHint": "Mark this entry as 'doctor agreed it matters'",
+    "corroborated": "Doctor agreed this entry matters",
+    "confirmedBadgeTooltip": "You've confirmed this disease before — citations are weighted higher next time the engine runs.",
     "evidence": "Evidence:",
     "showEvidence": "Show how this matched",
     "hideEvidence": "Hide evidence",
@@ -160,6 +165,52 @@
       "abnLabs": "Abnormal labs",
       "medications": "Medications",
       "hypotheses": "AI patterns"
+    }
+  },
+  "pair": {
+    "openButton": "Pair phone (QR)",
+    "modalTitle": "Pair a phone for capture",
+    "intro": "Scan the QR with a phone on the same WiFi. The phone will land on a focused capture page that posts photos straight into the journal. Locking the journal invalidates every paired phone.",
+    "ttlLabel": "Link valid for",
+    "ttlMinutes_one": "{{count}} minute",
+    "ttlMinutes_other": "{{count}} minutes",
+    "label": "Label",
+    "mintButton": "Generate pairing QR",
+    "minting": "Generating…",
+    "url": "URL",
+    "expiresIn": "Expires in {{seconds}}s",
+    "regenerate": "Regenerate",
+    "lanWarning": "We couldn't find a LAN IP — the QR resolves to the local machine only. Use phone hotspot or USB tethering.",
+    "lockNote": "When you lock the journal, every paired phone loses write access immediately.",
+    "sessionsHeading": "Paired phones",
+    "sessionsEmpty": "No phones paired yet.",
+    "revoke": "Revoke"
+  },
+  "mobile": {
+    "pair": {
+      "heading": "Pairing this phone",
+      "intro": "Verifying the pairing token…",
+      "success": "Paired ✓ — opening capture",
+      "failed": "Pairing failed. Ask the desktop to generate a new QR.",
+      "ownerLocked": "The desktop journal is locked. Ask the owner to unlock and try again.",
+      "continueAnyway": "Continue anyway"
+    },
+    "capture": {
+      "heading": "Diary capture",
+      "online": "Connected to your journal",
+      "offlineHint": "Offline — drafts are queued locally",
+      "ownerLocked": "Owner locked the journal — drafts are queued",
+      "tapShutter": "Tap the shutter to take a photo",
+      "shutter": "Take photo",
+      "notePlaceholder": "Optional note — what is happening right now?",
+      "save": "Save & sync",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "queued": "Queued (will sync when online)",
+      "outbox_one": "{{count}} queued",
+      "outbox_other": "{{count}} queued",
+      "errorGeneric": "Could not save. Try again.",
+      "privacyNote": "Photos are encrypted as soon as they reach the desktop. Nothing leaves your home network."
     }
   },
   "qr": {

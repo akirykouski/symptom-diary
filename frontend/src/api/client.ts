@@ -207,8 +207,19 @@ export const api = {
   getHypothesis: (id: string) => request<Hypothesis>("GET", `/api/hypotheses/${id}`),
   patchHypothesis: (
     id: string,
-    body: { status?: string; user_note?: string; dismissed_reason?: string },
+    body: {
+      status?: string;
+      user_note?: string;
+      dismissed_reason?: string;
+      corroborate_entry_id?: string;
+      uncorroborate_entry_id?: string;
+    },
   ) => request<Hypothesis>("PATCH", `/api/hypotheses/${id}`, body),
+  hypothesisFeedbackHistory: (limit = 50) =>
+    request<FeedbackEvent[]>(
+      "GET",
+      `/api/hypotheses/feedback-history?limit=${limit}`,
+    ),
   recheckHypotheses: () =>
     request<{ candidates_considered: number; hypotheses_written: number; user_signals: number }>(
       "POST",
@@ -272,6 +283,25 @@ export const api = {
     }>("POST", "/api/demo/load", { persona_id, overwrite }),
   activePersona: () =>
     request<{ persona_id: string | null }>("GET", "/api/demo/active"),
+
+  // mobile companion (PWA pairing + write surface)
+  mintMobilePairToken: (body?: { ttl_minutes?: number; label?: string }) =>
+    request<MobilePairToken>("POST", "/api/mobile/pair-token", {
+      ttl_minutes: body?.ttl_minutes ?? 10,
+      label: body?.label ?? "phone",
+    }),
+  exchangeMobilePairToken: (body: { token: string; label?: string }) =>
+    request<MobileSession & { ok: boolean }>("POST", "/api/mobile/exchange", {
+      token: body.token,
+      label: body.label ?? "phone",
+    }),
+  mobileWhoami: () =>
+    request<MobileWhoami>("GET", "/api/mobile/whoami"),
+  listMobileSessions: () =>
+    request<{ sessions: MobileSession[] }>("GET", "/api/mobile/sessions"),
+  revokeMobileSession: (id: string) =>
+    request<void>("DELETE", `/api/mobile/sessions/${encodeURIComponent(id)}`),
+  mobileLogout: () => request<void>("POST", "/api/mobile/logout"),
 
   // QR share (in-clinic handoff)
   createQrSession: (body: { scope?: "brief"; ttl_minutes?: number }) =>
@@ -467,7 +497,12 @@ export interface LabSeries {
 }
 
 export type SignalStrength = "weak" | "moderate" | "strong";
-export type HypothesisStatus = "active" | "dismissed" | "expired" | "confirmed";
+export type HypothesisStatus =
+  | "active"
+  | "dismissed"
+  | "expired"
+  | "confirmed"
+  | "suppressed";
 
 export interface MatchedFeature {
   feature_name: string;
@@ -497,6 +532,20 @@ export interface Hypothesis {
   expires_at: string;
   user_note: string | null;
   dismissed_reason: string | null;
+  corroborated_entry_ids: string[];
+  user_confirmed: boolean;
+}
+
+export interface FeedbackEvent {
+  id: string;
+  hypothesis_id: string;
+  disease_id: string;
+  disease_name: string;
+  category: string | null;
+  action: "dismissed" | "confirmed" | "reactivated";
+  reason: string | null;
+  recorded_at: string;
+  match_score_at_action: number;
 }
 
 export interface BriefStats {
@@ -517,6 +566,33 @@ export interface AskCitation {
 export interface AskRefusal {
   category: string;
   message: string;
+}
+
+export interface MobileSession {
+  id: string;
+  label: string;
+  created_at: string;
+  expires_at: string;
+  last_used_at: string | null;
+  fetches: number;
+}
+
+export interface MobilePairToken {
+  token: string;
+  created_at: string;
+  expires_at: string;
+  url: string;
+  qr_data_url: string;
+  lan_ok: boolean;
+  host: string;
+  port: number;
+  label_default: string;
+}
+
+export interface MobileWhoami {
+  paired: boolean;
+  owner_unlocked: boolean;
+  session?: MobileSession;
 }
 
 export interface QrSessionSummary {

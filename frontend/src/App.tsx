@@ -12,6 +12,8 @@ import LabsPage from "./pages/LabsPage";
 import MedicationsPage from "./pages/MedicationsPage";
 import HypothesesPage from "./pages/HypothesesPage";
 import InsightsPage from "./pages/InsightsPage";
+import MobileCapture from "./pages/MobileCapture";
+import MobilePair from "./pages/MobilePair";
 import SafetyBanner from "./components/SafetyBanner";
 
 export default function App() {
@@ -20,6 +22,20 @@ export default function App() {
     queryFn: api.status,
     refetchInterval: 60_000,
   });
+
+  // Mobile-companion routes are open to the phone, which has no desktop
+  // session cookie. Skip the auth-gate Routes entirely on `/m/*`.
+  if (typeof window !== "undefined" && window.location.pathname.startsWith("/m/")) {
+    return (
+      <div className="h-full flex flex-col">
+        <Routes>
+          <Route path="/m/pair" element={<MobilePair />} />
+          <Route path="/m/capture" element={<MobileCapture />} />
+          <Route path="*" element={<Navigate to="/m/capture" replace />} />
+        </Routes>
+      </div>
+    );
+  }
 
   if (status.isLoading) {
     return <FullScreenMessage>Loading…</FullScreenMessage>;

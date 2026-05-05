@@ -37,6 +37,11 @@ export default function HypothesesPage() {
     queryKey: ["hypotheses", statusFilter],
     queryFn: () => api.listHypotheses(statusFilter),
   });
+  const suppressedList = useQuery({
+    queryKey: ["hypotheses", "suppressed"],
+    queryFn: () => api.listHypotheses("suppressed" as never),
+    enabled: statusFilter === "active",
+  });
   const recheck = useMutation({
     mutationFn: api.recheckHypotheses,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["hypotheses"] }),
@@ -106,8 +111,57 @@ export default function HypothesesPage() {
             ))}
           </ol>
         )}
+
+        {statusFilter === "active" && (suppressedList.data?.length ?? 0) > 0 && (
+          <SuppressedSection items={suppressedList.data ?? []} />
+        )}
       </main>
     </div>
+  );
+}
+
+function SuppressedSection({ items }: { items: Hypothesis[] }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+
+  const reactivate = useMutation({
+    mutationFn: (id: string) => api.patchHypothesis(id, { status: "active" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["hypotheses"] }),
+  });
+
+  return (
+    <section className="border-t border-ink/10 pt-4 mt-6">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-xs uppercase tracking-wide text-ink/55 hover:text-ink/80 flex items-center gap-2"
+      >
+        <span>{open ? "▾" : "▸"}</span>
+        {t("hypotheses.suppressedHeading", { count: items.length })}
+      </button>
+      {open && (
+        <ol className="mt-3 space-y-2">
+          {items.map((h) => (
+            <li
+              key={h.id}
+              className="flex items-center gap-3 bg-ink/3 border border-ink/10 rounded-md px-3 py-2 text-xs"
+            >
+              <span className="text-ink/45 w-12 font-mono">{h.signal_strength.slice(0, 4)}</span>
+              <span className="flex-1 text-ink/85">{h.disease_name}</span>
+              <span className="text-ink/40 font-mono">{h.match_score.toFixed(2)}</span>
+              <button
+                onClick={() => reactivate.mutate(h.id)}
+                disabled={reactivate.isPending}
+                className="text-emerald-300 hover:text-emerald-200 disabled:opacity-50"
+              >
+                {t("hypotheses.reactivate")}
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }
 
@@ -177,7 +231,17 @@ function HypothesisCard({ h, index }: { h: Hypothesis; index: number }) {
                 </span>
               )}
             </div>
-            <h2 className="text-xl font-semibold">{h.disease_name}</h2>
+            <h2 className="text-xl font-semibold">
+              {h.disease_name}
+              {h.user_confirmed && (
+                <span
+                  title={t("hypotheses.confirmedBadgeTooltip") ?? ""}
+                  className="ml-2 text-amber-300"
+                >
+                  ★
+                </span>
+              )}
+            </h2>
           </div>
           <ScoreBadge score={h.match_score} />
         </div>
@@ -255,22 +319,48 @@ function ScoreBadge({ score }: { score: number }) {
 
 function EvidenceChips({ h }: { h: Hypothesis }) {
   const { t } = useTranslation();
+  const qc = useQueryClient();
+  const corroborated = new Set(h.corroborated_entry_ids ?? []);
   const entries = h.cited_entry_ids;
   const labs = h.cited_lab_value_ids;
   const meds = h.cited_medication_ids;
+
+  const toggle = useMutation({
+    mutationFn: ({ entryId, on }: { entryId: string; on: boolean }) =>
+      api.patchHypothesis(
+        h.id,
+        on ? { corroborate_entry_id: entryId } : { uncorroborate_entry_id: entryId },
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["hypotheses"] }),
+  });
+
   if (entries.length === 0 && labs.length === 0 && meds.length === 0) return null;
   return (
     <div className="text-xs text-ink/65 flex flex-wrap gap-1.5">
       <span className="text-ink/45 mr-1">{t("hypotheses.evidence")}</span>
-      {entries.slice(0, 6).map((eid) => (
-        <span
-          key={eid}
-          className="bg-ink/5 border border-ink/15 px-2 py-0.5 rounded font-mono"
-          title={eid}
-        >
-          entry · {eid.split("-")[0]}
-        </span>
-      ))}
+      {entries.slice(0, 6).map((eid) => {
+        const isOn = corroborated.has(eid);
+        return (
+          <button
+            key={eid}
+            type="button"
+            onClick={() => toggle.mutate({ entryId: eid, on: !isOn })}
+            title={
+              isOn
+                ? t("hypotheses.corroborated") ?? ""
+                : t("hypotheses.corroborateHint") ?? ""
+            }
+            className={`px-2 py-0.5 rounded font-mono border transition ${
+              isOn
+                ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-200"
+                : "bg-ink/5 border-ink/15 hover:border-emerald-400/40"
+            }`}
+          >
+            {isOn && <span className="mr-1">✓</span>}
+            entry · {eid.split("-")[0]}
+          </button>
+        );
+      })}
       {labs.slice(0, 4).map((lid) => (
         <span
           key={lid}
