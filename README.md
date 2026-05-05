@@ -99,12 +99,17 @@ Open http://localhost:5173 — pick a passphrase and start journaling. Vite prox
 
 ### Ollama (for AI features)
 
-```bash
-# install once: https://ollama.com
-ollama serve            # listens on localhost:11434
-```
+The app ships a 3-step bootstrap wizard at `/llm`:
 
-In the app, click "AI" in the timeline header. The page shows whether Ollama is reachable and lets you pull the extractor + embedder models with a live progress bar. Override the default model name with:
+1. **Install Ollama**
+   - macOS + Homebrew → one-click `brew install ollama` (streamed live).
+   - macOS without Homebrew → "Open download page" link.
+   - Linux → official one-liner shown with copy-to-clipboard (it needs sudo, so we don't auto-run it).
+   - Windows → "Open download page" link.
+2. **Start Ollama** → spawns `ollama serve` as a managed child process; killed automatically when the backend shuts down.
+3. **Pull AI models** → existing pull-with-progress UI (`gemma3:4b` + `nomic-embed-text` are good defaults).
+
+If you'd rather start it yourself: `ollama serve` (the wizard auto-detects an externally-started daemon and skips its own spawn). Override the default model with:
 
 ```bash
 DIARY_LLM_MODEL=gemma3:4b ./run-backend.sh   # or any Ollama tag you have
@@ -139,7 +144,7 @@ There is **no recovery**. If you lose the passphrase, the data is gone.
 ```bash
 cd backend
 .venv/bin/pytest -q
-# 28 passed
+# 36 passed
 ```
 
 ## Smoke checklist (manual UI test)

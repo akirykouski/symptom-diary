@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, streamPull } from "../api/client";
 import type { PullChunk } from "../api/client";
+import OllamaWizard from "../components/OllamaWizard";
 
 interface PullState {
   model: string;
@@ -70,6 +71,8 @@ export default function LlmSetup() {
 
       <div className="p-6 max-w-2xl space-y-6">
         <p className="text-ink/70">{t("llm.intro")}</p>
+
+        <OllamaWizard />
 
         <ConnectionBanner data={status.data} loading={status.isLoading} />
 

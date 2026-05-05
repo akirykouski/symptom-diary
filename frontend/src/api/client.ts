@@ -259,6 +259,19 @@ export const api = {
     }>("POST", "/api/demo/load", { persona_id, overwrite }),
   activePersona: () =>
     request<{ persona_id: string | null }>("GET", "/api/demo/active"),
+
+  // ollama bootstrap
+  ollamaSetup: () => request<OllamaSetupState>("GET", "/api/ollama/setup"),
+  ollamaDaemon: () => request<OllamaDaemonState>("GET", "/api/ollama/daemon"),
+  ollamaStart: () =>
+    request<{
+      running: boolean;
+      managed_pid: number | null;
+      started: boolean;
+      reason: string;
+    }>("POST", "/api/ollama/start"),
+  ollamaStop: () =>
+    request<{ stopped: boolean; reason?: string }>("POST", "/api/ollama/stop"),
 };
 
 export interface EntryEntity {
@@ -451,6 +464,90 @@ export interface BriefStats {
   abnormal_labs: number;
   medications: number;
   hypotheses: number;
+}
+
+export interface OllamaSetupMethod {
+  id: string;
+  label: string;
+  command: string | null;
+  url?: string;
+  auto_runnable: boolean;
+  needs_confirm: boolean;
+  hint?: string;
+}
+
+export interface OllamaSetupState {
+  platform: "macos" | "linux" | "windows" | string;
+  arch: string;
+  binary_present: boolean;
+  binary_path: string | null;
+  brew_present: boolean;
+  daemon_reachable: boolean;
+  daemon_managed_pid: number | null;
+  download_url: string | null;
+  methods: OllamaSetupMethod[];
+  linux_one_liner: string;
+}
+
+export interface OllamaDaemonState {
+  managed: boolean;
+  pid: number | null;
+  started_at: number | null;
+  binary_present: boolean;
+}
+
+export interface OllamaInstallChunk {
+  type: "line" | "exit" | "error";
+  text?: string;
+  code?: number;
+  message?: string;
+}
+
+/**
+ * Stream NDJSON output from POST /api/ollama/install/{method}.
+ * Each line is `{"type":"line","text":"..."}` until a final
+ * `{"type":"exit","code":N}` or `{"type":"error","message":"..."}`.
+ */
+export async function streamOllamaInstall(
+  method: string,
+  onChunk: (chunk: OllamaInstallChunk) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const r = await fetch(`/api/ollama/install/${method}`, {
+    method: "POST",
+    credentials: "include",
+    signal,
+  });
+  if (!r.ok || !r.body) {
+    throw new ApiError(r.status, await r.text());
+  }
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, idx).trim();
+      buffer = buffer.slice(idx + 1);
+      if (!line) continue;
+      try {
+        onChunk(JSON.parse(line) as OllamaInstallChunk);
+      } catch {
+        // ignore non-JSON
+      }
+    }
+  }
+  const tail = buffer.trim();
+  if (tail) {
+    try {
+      onChunk(JSON.parse(tail) as OllamaInstallChunk);
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 /**
