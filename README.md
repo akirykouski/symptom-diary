@@ -4,7 +4,14 @@ A local, multimodal symptom diary with graph visualization and a background hypo
 
 ## Status
 
-**MVP-4** — encrypted local journal + Ollama-driven entity extraction + graph + multimodal capture + **Hypothesis Engine** + **clinician brief** (markdown + printable HTML + WeasyPrint PDF) + **Ask-anything Q&A with red-flag refusal layer** + **encrypted `.diary` bundle export/import** + **in-clinic QR share** + curated synthetic patients. The full roadmap lives in `../symptom-diary-plan (1).md`.
+**MVP-5** — everything from MVP-4 plus a **PWA mobile capture companion**
+(scan a QR with a phone, take photos straight into the journal, IndexedDB
+outbox queues drafts when the LAN drops) and a **Hypothesis Engine learning
+loop** (dismissals suppress for 60 days unless the score grows ≥ 30%;
+confirmed diseases pin to the top and get a ×1.25 boost; per-entry "doctor
+agreed" corroboration shows up in the brief).
+
+The full roadmap lives in `../symptom-diary-plan (1).md`.
 
 ## What works today
 
@@ -62,6 +69,17 @@ A local, multimodal symptom diary with graph visualization and a background hypo
   read-only, scoped to the brief) so a clinician can scan it from a phone on
   the same WiFi and view the brief in their own browser. Locking the journal
   immediately invalidates active share links.
+- **Mobile capture companion (PWA)** — pair a phone via QR; the phone lands
+  on a focused capture page (camera shutter + optional note) that uploads
+  photos directly into the journal. IndexedDB outbox queues drafts when the
+  LAN drops and auto-flushes when reachable. Mobile sessions live as long as
+  the desktop is unlocked; locking the journal invalidates every paired phone.
+- **Hypothesis Engine learning loop** — Confirm/Dismiss actions on patterns
+  feed back into matching: dismissed diseases get a 60-day cooldown unless
+  the new aggregate score exceeds the dismissal score by 30%; confirmed
+  diseases pin to the top of the list with a ★ badge and a ×1.25 score
+  boost; users can mark individual citations as "doctor agreed", which
+  carries a ✓ marker into the printed brief.
 - **Synthetic reference patients** (`POST /api/demo/load`) — Maria (8mo SLE
   picture), Tom (6mo MCAS picture), Anna (5mo Hashimoto picture). Pre-loaded
   diary text, lab results, prescriptions. One-click loadable from the timeline.
@@ -161,7 +179,7 @@ There is **no recovery**. If you lose the passphrase, the data is gone.
 ```bash
 cd backend
 .venv/bin/pytest -q
-# 86 passed
+# 118 passed
 ```
 
 ## Smoke checklist (manual UI test)

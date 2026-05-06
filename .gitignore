@@ -21,6 +21,10 @@ frontend/.vite/
 *.tsbuildinfo
 .DS_Store
 
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
+
 # Local user data (NEVER commit)
 *.sqlite
 *.sqlite-journal

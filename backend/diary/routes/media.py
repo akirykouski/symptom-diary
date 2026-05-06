@@ -22,7 +22,8 @@ from fastapi.responses import StreamingResponse
 from .. import media as media_mod
 from ..config import MAX_MEDIA_BYTES, SESSION_COOKIE
 from ..db import transaction
-from ..deps import require_unlocked
+from ..deps import require_mobile_or_unlocked, require_unlocked
+from ..mobile_pair import SESSION_COOKIE_NAME as MOBILE_COOKIE, mobile_store
 from ..models import MediaOut
 from ..session import store
 
@@ -70,6 +71,25 @@ def _master_key_or_401(diary_session: str | None) -> bytes:
     return key
 
 
+def _master_key_for_owner_or_mobile(
+    diary_session: str | None, diary_mobile_session: str | None
+) -> bytes:
+    """Resolve the master key for an upload route that accepts either cookie.
+
+    Owner cookie path: bumps activity, returns the per-session key.
+    Mobile cookie path: validates the mobile session, then peeks the
+    desktop's still-unlocked master key without bumping activity.
+    """
+    key = store.get_master_key(diary_session)
+    if key is not None:
+        return key
+    if diary_mobile_session and mobile_store.touch(diary_mobile_session) is not None:
+        peeked = store.peek_master_key()
+        if peeked is not None:
+            return peeked
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="locked")
+
+
 @router.post(
     "/api/entries/{entry_id}/media",
     response_model=MediaOut,
@@ -80,9 +100,10 @@ async def upload_media(
     file: UploadFile = File(...),
     kind: str | None = Form(default=None),
     diary_session: str | None = Cookie(default=None, alias=SESSION_COOKIE),
-    conn: sqlite3.Connection = Depends(require_unlocked),
+    diary_mobile_session: str | None = Cookie(default=None, alias=MOBILE_COOKIE),
+    conn: sqlite3.Connection = Depends(require_mobile_or_unlocked),
 ) -> MediaOut:
-    master_key = _master_key_or_401(diary_session)
+    master_key = _master_key_for_owner_or_mobile(diary_session, diary_mobile_session)
 
     row = conn.execute("SELECT id FROM entry WHERE id = ?", (entry_id,)).fetchone()
     if row is None:

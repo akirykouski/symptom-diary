@@ -27,16 +27,22 @@ class AskRequest(BaseModel):
     language: str = Field("en", pattern=r"^[a-z]{2}$")
 
 
+async def _build_intro(ctx: dict, *, enrich: bool) -> str | None:
+    """Try the LLM intro (when enrich=True); on any failure return None so
+    render_markdown falls back to the deterministic summary."""
+    if not enrich:
+        return None
+    return await brief.maybe_intro(ctx, llm=OllamaClient())
+
+
 @router.post("/api/insights/brief")
 async def post_brief(
     body: BriefRequest,
     conn: sqlite3.Connection = Depends(require_unlocked),
 ) -> dict:
     ctx = brief.gather_context(conn, from_=body.from_, to=body.to)
-    intro = await brief.maybe_intro(ctx, llm=OllamaClient()) if body.enrich else None
-    md = brief.render_markdown(ctx)
-    if intro:
-        md = md.replace("## At a glance", "## Patient-reported context\n\n" + intro + "\n\n## At a glance", 1)
+    intro = await _build_intro(ctx, enrich=body.enrich)
+    md = brief.render_markdown(ctx, intro=intro)
     return {
         "markdown": md,
         "stats": {
@@ -57,10 +63,8 @@ async def get_brief_html(
     conn: sqlite3.Connection = Depends(require_unlocked),
 ) -> HTMLResponse:
     ctx = brief.gather_context(conn, from_=from_, to=to)
-    intro = await brief.maybe_intro(ctx, llm=OllamaClient()) if enrich else None
-    md = brief.render_markdown(ctx)
-    if intro:
-        md = md.replace("## At a glance", "## Patient-reported context\n\n" + intro + "\n\n## At a glance", 1)
+    intro = await _build_intro(ctx, enrich=enrich)
+    md = brief.render_markdown(ctx, intro=intro)
     html = brief.render_html(md)
     return HTMLResponse(content=html)
 
@@ -82,14 +86,8 @@ async def get_brief_pdf(
     UI can hint at the difference.
     """
     ctx = brief.gather_context(conn, from_=from_, to=to)
-    intro = await brief.maybe_intro(ctx, llm=OllamaClient()) if enrich else None
-    md = brief.render_markdown(ctx)
-    if intro:
-        md = md.replace(
-            "## At a glance",
-            "## Patient-reported context\n\n" + intro + "\n\n## At a glance",
-            1,
-        )
+    intro = await _build_intro(ctx, enrich=enrich)
+    md = brief.render_markdown(ctx, intro=intro)
     html = brief.render_html(md)
 
     if brief.pdf_engine_available():
