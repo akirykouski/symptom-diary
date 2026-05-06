@@ -7,7 +7,7 @@ we can verify the streaming + exit-code plumbing end-to-end.
 from __future__ import annotations
 
 import json
-
+import sys
 import pytest
 from fastapi.testclient import TestClient
 
@@ -74,7 +74,7 @@ def test_install_streams_ndjson_with_safe_command(
     monkeypatch.setitem(
         ollama_setup._RUNNABLE,
         "brew",
-        ["echo", "hello-from-streaming-test"],
+        [sys.executable, "-c", "print('hello-from-streaming-test')"],
     )
     # Force the detect step to show brew as auto-runnable so the route lets us through.
     real_detect = ollama_setup.detect_state
