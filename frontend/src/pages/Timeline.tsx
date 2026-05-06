@@ -193,6 +193,12 @@ function QueueIndicator({
   failed: number;
   ollamaUp: boolean;
 }) {
+  const qc = useQueryClient();
+  const retry = useMutation({
+    mutationFn: () => api.retryFailedJobs(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["queue", "status"] }),
+  });
+
   if (queued === 0 && failed === 0) {
     return ollamaUp ? null : (
       <Link
@@ -212,12 +218,19 @@ function QueueIndicator({
         </span>
       )}
       {failed > 0 && (
-        <Link
-          to="/llm"
-          className="px-2 py-1 rounded-full border border-red-500/40 text-red-300 hover:bg-red-500/10"
+        <button
+          type="button"
+          onClick={() => retry.mutate()}
+          disabled={retry.isPending}
+          title={
+            retry.isPending
+              ? "Re-queueing…"
+              : `${failed} entr${failed === 1 ? "y's" : "ies'"} AI extraction failed. Click to retry.`
+          }
+          className="px-2 py-1 rounded-full border border-red-500/40 text-red-300 hover:bg-red-500/10 disabled:opacity-60"
         >
-          {failed} failed
-        </Link>
+          {retry.isPending ? "↻ retrying" : `↻ ${failed} failed`}
+        </button>
       )}
     </span>
   );

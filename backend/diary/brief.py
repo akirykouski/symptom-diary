@@ -6,16 +6,16 @@ default), so the brief is reproducible across runs and never makes claims
 without an entry/lab/document citation.
 
 Optional `enrich=True` will additionally call Gemma to produce a 3-5 sentence
-"narrative" paragraph at the top, but every sentence is checked against the
-hedged-language regex used by the Hypothesis Engine; on rejection we drop
-the LLM paragraph and keep only the deterministic content.
+"Patient-reported context" paragraph at the top, but every sentence is checked
+against the hedged-language regex used by the Hypothesis Engine; on rejection
+we fall back to a deterministic summary so the section is always present.
 """
 from __future__ import annotations
 
 import json
 import re
 import sqlite3
-from collections import Counter, defaultdict
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -90,18 +90,6 @@ def gather_context(
     ).fetchall()
     top_entities = [dict(r) for r in entity_rows]
 
-    edge_rows = conn.execute(
-        """
-        SELECT s.canonical_name AS src, d.canonical_name AS dst,
-               e.kind, e.weight, e.evidence_count, e.last_observed_at
-        FROM edge e
-        JOIN entity s ON s.id = e.src_entity_id
-        JOIN entity d ON d.id = e.dst_entity_id
-        ORDER BY e.weight DESC LIMIT 30
-        """
-    ).fetchall()
-    top_edges = [dict(r) for r in edge_rows]
-
     abnormal_labs = conn.execute(
         """
         SELECT lv.id, lv.test_name, lv.test_name_raw, lv.value_numeric, lv.unit,
@@ -138,27 +126,39 @@ def gather_context(
         """
         SELECT h.id, h.signal_strength, h.match_score, h.rationale_md,
                h.suggested_actions_md, h.cited_entry_ids, h.cited_lab_value_ids,
-               d.name AS disease_name, d.source_url, d.red_flag, d.category
+               d.name AS disease_name, d.source_url, d.red_flag, d.category,
+               (SELECT 1 FROM hypothesis_feedback hf
+                WHERE hf.disease_id = h.disease_id AND hf.action = 'confirmed'
+                LIMIT 1) AS user_confirmed
         FROM hypothesis h JOIN disease_profile d ON d.id = h.disease_id
         WHERE h.status = 'active'
-        ORDER BY CASE h.signal_strength
+        ORDER BY (user_confirmed IS NOT NULL) DESC,
+          CASE h.signal_strength
           WHEN 'strong' THEN 0 WHEN 'moderate' THEN 1 ELSE 2 END,
           h.match_score DESC
         """
     ).fetchall()
+    # Map hypothesis_id -> set of corroborated entry ids in one round trip.
+    corroboration_rows = conn.execute(
+        "SELECT hypothesis_id, entry_id FROM entry_corroboration"
+    ).fetchall()
+    corroborated_by_hyp: dict[str, set[str]] = {}
+    for r in corroboration_rows:
+        corroborated_by_hyp.setdefault(r["hypothesis_id"], set()).add(r["entry_id"])
 
     return {
         "entries": entries,
         "episodes": _entry_episodes(entries),
         "top_entities": top_entities,
-        "top_edges": top_edges,
         "abnormal_labs": [dict(r) for r in abnormal_labs],
         "medications": [dict(r) for r in medications],
         "documents": [dict(r) for r in documents],
         "hypotheses": [
             {**dict(r),
              "cited_entry_ids": json.loads(r["cited_entry_ids"] or "[]"),
-             "cited_lab_value_ids": json.loads(r["cited_lab_value_ids"] or "[]")}
+             "cited_lab_value_ids": json.loads(r["cited_lab_value_ids"] or "[]"),
+             "corroborated_entry_ids": sorted(corroborated_by_hyp.get(r["id"], set())),
+             "user_confirmed": bool(r["user_confirmed"])}
             for r in hypotheses
         ],
         "from": from_,
@@ -173,7 +173,90 @@ def _entry_id_short(eid: str) -> str:
     return f"#{eid.split('-')[0]}"
 
 
-def render_markdown(ctx: dict[str, Any]) -> str:
+def _lab_severity(lv: dict[str, Any]) -> float:
+    """Fractional deviation of a lab value from its reference range.
+
+    0 means in-range or unmeasurable; larger means more abnormal. Used to
+    sort within a date so the clinician's eye lands on the worst number.
+    """
+    v = lv.get("value_numeric")
+    if v is None:
+        # No numeric value — fall back to flag direction so abnormals still
+        # rank above missing-value rows.
+        return 0.001 if lv.get("is_abnormal") else 0.0
+    lo = lv.get("reference_low")
+    hi = lv.get("reference_high")
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return 0.0
+    if lo is not None and v < float(lo):
+        denom = max(abs(float(lo)), 1e-9)
+        return (float(lo) - v) / denom
+    if hi is not None and v > float(hi):
+        denom = max(abs(float(hi)), 1e-9)
+        return (v - float(hi)) / denom
+    return 0.0
+
+
+def _sort_labs_by_date_then_severity(labs: list[dict]) -> list[dict]:
+    """Newest date first; within a date, most abnormal first."""
+    by_date: dict[str, list[dict]] = defaultdict(list)
+    undated: list[dict] = []
+    for lv in labs:
+        d = _date(lv.get("measured_at"))
+        if d:
+            by_date[d].append(lv)
+        else:
+            undated.append(lv)
+    out: list[dict] = []
+    for d in sorted(by_date.keys(), reverse=True):
+        out.extend(sorted(by_date[d], key=_lab_severity, reverse=True))
+    out.extend(undated)
+    return out
+
+
+def _deterministic_intro(ctx: dict[str, Any]) -> str:
+    """Short clinician-style summary built without an LLM.
+
+    Always available so the "Patient-reported context" section is present
+    even when Ollama isn't configured or the LLM output is rejected by the
+    hedged-language safety check.
+    """
+    syms = [e["canonical_name"] for e in ctx["top_entities"] if e.get("type") == "symptom"]
+    abn = ctx["abnormal_labs"]
+    parts: list[str] = ["Patient-reported context:"]
+    if syms:
+        head = ", ".join(syms[:3])
+        parts.append(f" The journal documents recurring {head}.")
+    if abn:
+        dates = sorted(
+            {_date(lv.get("measured_at")) for lv in abn if lv.get("measured_at")}
+        )
+        if len(dates) >= 2:
+            parts.append(
+                f" Multiple abnormal lab values are recorded across {dates[0]} → {dates[-1]} — see below."
+            )
+        elif dates:
+            parts.append(f" Abnormal lab values are recorded on {dates[0]} — see below.")
+    if ctx.get("medications"):
+        parts.append(" The patient reports a current medication regimen, listed below.")
+    if not syms and not abn:
+        parts.append(" The journal does not yet document recurring symptoms or abnormal labs.")
+    return "".join(parts)
+
+
+def render_markdown(ctx: dict[str, Any], *, intro: str | None = None) -> str:
+    """Render the full brief in markdown.
+
+    Section order matches the clinician-feedback rewrite:
+      1. Patient-reported context  (always present — `intro` or deterministic fallback)
+      2. Abnormal lab values       (newest date first; severity-ranked within date)
+      3. Patterns AI noticed       (promoted from the bottom)
+      4. Active medications
+      5. Top reported symptoms     (entity_type = symptom only)
+      6. Documents on file
+    """
     out: list[str] = []
     out.append("# Symptom diary brief")
     span = []
@@ -188,46 +271,23 @@ def render_markdown(ctx: dict[str, Any]) -> str:
     out.append(DISCLAIMER)
     out.append("")
 
-    # Snapshot
-    out.append("## At a glance")
-    out.append(f"- Entries: **{len(ctx['entries'])}**")
-    out.append(f"- Documents on file: **{len(ctx['documents'])}**")
-    out.append(f"- Abnormal lab values: **{len(ctx['abnormal_labs'])}**")
-    out.append(f"- Medications recorded: **{len(ctx['medications'])}**")
-    out.append(f"- AI-noticed patterns: **{len(ctx['hypotheses'])}**")
+    # 1) Patient-reported context — mandatory, first.
+    out.append("## Patient-reported context")
+    out.append("")
+    out.append(intro or _deterministic_intro(ctx))
     out.append("")
 
-    # Top symptoms
-    if ctx["top_entities"]:
-        out.append("## Top reported entities")
-        out.append("")
-        out.append("| Entity | Type | Mentions |")
-        out.append("|---|---|---:|")
-        for e in ctx["top_entities"][:15]:
-            out.append(f"| {e['canonical_name']} | {e['type']} | {e['n']} |")
-        out.append("")
-
-    # Strong relationships
-    if ctx["top_edges"]:
-        out.append("## Co-occurring patterns")
-        for ed in ctx["top_edges"][:10]:
-            arrow = "↔" if ed["kind"] == "co_occurs" else "→"
-            out.append(
-                f"- **{ed['src']}** {arrow} **{ed['dst']}** "
-                f"({ed['kind']}, weight {ed['weight']:.0f}, "
-                f"last observed {_date(ed.get('last_observed_at'))})"
-            )
-        out.append("")
-
-    # Abnormal labs
+    # 2) Abnormal lab values
     if ctx["abnormal_labs"]:
         out.append("## Abnormal lab values")
         out.append("")
         out.append("| Test | Value | Reference | Flag | Date | Source |")
         out.append("|---|---|---|---|---|---|")
-        for lv in ctx["abnormal_labs"][:25]:
+        for lv in _sort_labs_by_date_then_severity(ctx["abnormal_labs"])[:25]:
             flag = "↑ high" if lv["is_abnormal"] == 1 else "↓ low"
-            ref = f"{lv.get('reference_low','—')}–{lv.get('reference_high','—')}"
+            lo = lv.get("reference_low")
+            hi = lv.get("reference_high")
+            ref = f"{lo if lo is not None else '—'}–{hi if hi is not None else '—'}"
             value = lv.get("value_numeric") if lv.get("value_numeric") is not None else "—"
             out.append(
                 f"| {lv['test_name_raw']} | {value} {lv.get('unit') or ''} | "
@@ -236,9 +296,53 @@ def render_markdown(ctx: dict[str, Any]) -> str:
             )
         out.append("")
 
-    # Medications
+    # 3) Patterns AI noticed — moved up from the bottom.
+    if ctx["hypotheses"]:
+        out.append("## Patterns AI noticed for clinician's consideration")
+        out.append(
+            "_Each pattern is hedged language only — never a diagnosis. "
+            "Citations link back to journal entries._"
+        )
+        out.append("")
+        # If every hypothesis carries the same suggested next step, lift it
+        # to the section footer to stop the wall-of-repetition look.
+        actions = [
+            (h.get("suggested_actions_md") or "").strip()
+            for h in ctx["hypotheses"]
+        ]
+        non_empty = [a for a in actions if a]
+        common_action = (
+            non_empty[0] if non_empty and all(a == non_empty[0] for a in non_empty) else None
+        )
+
+        for h in ctx["hypotheses"]:
+            badge = h["signal_strength"].upper()
+            star = " ★" if h.get("user_confirmed") else ""
+            out.append(f"### [{badge}] {h['disease_name']}{star}")
+            out.append("")
+            out.append(h["rationale_md"])
+            out.append("")
+            if h["cited_entry_ids"]:
+                corroborated = set(h.get("corroborated_entry_ids") or [])
+                cites = ", ".join(
+                    f"{_entry_id_short(eid)}{' ✓' if eid in corroborated else ''}"
+                    for eid in h["cited_entry_ids"]
+                )
+                out.append(f"_Cited entries: {cites}_  ")
+            if h.get("source_url"):
+                out.append(f"_Reference: {h['source_url']}_")
+            if not common_action and h.get("suggested_actions_md"):
+                out.append("")
+                out.append("**Suggested next step:** " + h["suggested_actions_md"])
+            out.append("")
+
+        if common_action:
+            out.append("**Suggested next step:** " + common_action)
+            out.append("")
+
+    # 4) Active medications
     if ctx["medications"]:
-        out.append("## Medications recorded in journal")
+        out.append("## Active medications")
         for m in ctx["medications"][:15]:
             line = f"- **{m['drug_name_raw']}**"
             extras = []
@@ -251,7 +355,20 @@ def render_markdown(ctx: dict[str, Any]) -> str:
             out.append(line)
         out.append("")
 
-    # Documents
+    # 5) Top reported symptoms — symptom entities only, no Type column.
+    sym_entities = [
+        e for e in ctx["top_entities"] if (e.get("type") or "").lower() == "symptom"
+    ][:8]
+    if sym_entities:
+        out.append("## Top reported symptoms")
+        out.append("")
+        out.append("| Symptom | Mentions |")
+        out.append("|---|---:|")
+        for e in sym_entities:
+            out.append(f"| {e['canonical_name']} | {e['n']} |")
+        out.append("")
+
+    # 6) Documents on file
     if ctx["documents"]:
         out.append("## Documents on file")
         for d in ctx["documents"][:10]:
@@ -263,29 +380,11 @@ def render_markdown(ctx: dict[str, Any]) -> str:
             )
             if d.get("findings_md"):
                 excerpt = d["findings_md"].strip().splitlines()[0][:200]
-                out.append(f"  > {excerpt}")
+                # Note the lack of leading whitespace: the markdown→HTML pass
+                # only matches `> ` at column 0, so indenting here used to
+                # render the literal ">" instead of a blockquote.
+                out.append(f"> {excerpt}")
         out.append("")
-
-    # Hypotheses
-    if ctx["hypotheses"]:
-        out.append("## Patterns AI noticed for clinician's consideration")
-        out.append("_Each pattern is hedged language only — never a diagnosis. Citations link back to journal entries._")
-        out.append("")
-        for h in ctx["hypotheses"]:
-            badge = h["signal_strength"].upper()
-            out.append(f"### [{badge}] {h['disease_name']}")
-            out.append("")
-            out.append(h["rationale_md"])
-            out.append("")
-            if h["cited_entry_ids"]:
-                cites = ", ".join(_entry_id_short(eid) for eid in h["cited_entry_ids"])
-                out.append(f"_Cited entries: {cites}_  ")
-            if h.get("source_url"):
-                out.append(f"_Reference: {h['source_url']}_")
-            if h.get("suggested_actions_md"):
-                out.append("")
-                out.append("**Suggested next step:** " + h["suggested_actions_md"])
-            out.append("")
 
     out.append("---")
     out.append(f"_Brief generated {_now()}._")
@@ -296,29 +395,54 @@ def render_markdown(ctx: dict[str, Any]) -> str:
 
 
 _INTRO_SYSTEM = (
-    "You are summarising a symptom-journal context for a clinician. "
-    "Output 3-5 cautious sentences. Use ONLY hedged language: 'the patient "
-    "reports', 'the journal documents', 'the pattern of complaints includes'. "
-    "Never assert diagnoses. Refer to entry IDs as '[entry-id-prefix]' when "
-    "you cite. Begin with 'Patient-reported context:'."
+    "You are summarising a symptom-journal context for a clinician in 3-5 "
+    "cautious sentences. Use ONLY hedged language: 'the patient reports', "
+    "'the journal documents', 'the pattern of complaints includes'. Never "
+    "assert a diagnosis. When citing, use the EXACT [entry-XXXXXXXX] keys "
+    "you were given verbatim — never write 'entry-id-prefix' or any other "
+    "placeholder. Do NOT include meta-commentary about how many patterns "
+    "or entries the brief contains. Do NOT restate the medication count. "
+    "Begin with 'Patient-reported context:'."
 )
+
+_PLACEHOLDER_RE = re.compile(r"\[entry-id-prefix\]", re.IGNORECASE)
+_CITATION_RE = re.compile(r"\[entry-([a-f0-9]{4,16})\]", re.IGNORECASE)
 
 
 def _intro_prompt(ctx: dict[str, Any]) -> str:
-    top = ", ".join(e["canonical_name"] for e in ctx["top_entities"][:8])
-    n_abn = len(ctx["abnormal_labs"])
-    n_meds = len(ctx["medications"])
-    n_hyp = len(ctx["hypotheses"])
+    syms = [
+        e["canonical_name"]
+        for e in ctx["top_entities"]
+        if (e.get("type") or "").lower() == "symptom"
+    ][:8]
+    # Hand the LLM real entry-id prefixes it can cite, with a short snippet
+    # of each so the citation is grounded.
+    bullet_entries = ctx["entries"][-12:] if ctx.get("entries") else []
+    bullets: list[str] = []
+    for e in bullet_entries:
+        prefix = e["id"].split("-")[0]
+        snippet = (e.get("text_md") or "").strip().splitlines()
+        head = snippet[0][:120] if snippet else ""
+        bullets.append(f"- [entry-{prefix}] {head}")
     return (
-        f"Top reported entities: {top}\n"
-        f"Number of abnormal labs: {n_abn}\n"
-        f"Number of recorded medications: {n_meds}\n"
-        f"Number of active AI-noticed patterns: {n_hyp}\n"
-        "Write the cautious 3-5 sentence summary now."
+        f"Top reported symptoms: {', '.join(syms) or '—'}\n"
+        f"Number of abnormal labs: {len(ctx['abnormal_labs'])}\n"
+        f"Number of recorded medications: {len(ctx['medications'])}\n"
+        f"Recent journal entries (cite using the [entry-…] keys exactly):\n"
+        + "\n".join(bullets)
+        + "\n\nWrite the cautious 3-5 sentence summary now. Cite at most 3 "
+          "entries inline using their exact [entry-…] keys from the list "
+          "above. Do NOT invent new entry IDs."
     )
 
 
 async def maybe_intro(ctx: dict[str, Any], *, llm: OllamaClient | None) -> str | None:
+    """Generate the "Patient-reported context" intro via the LLM.
+
+    Returns None on any failure (Ollama unreachable, unsafe wording,
+    placeholder leak, or hallucinated entry IDs). Callers should fall
+    back to `_deterministic_intro` so the section is always present.
+    """
     if llm is None:
         return None
     try:
@@ -328,10 +452,29 @@ async def maybe_intro(ctx: dict[str, Any], *, llm: OllamaClient | None) -> str |
             timeout=60.0,
         )
         text = text.strip()
+        if not text:
+            return None
+        if _PLACEHOLDER_RE.search(text):
+            return None
         if not _is_safe_language(text):
             return None
         if "diagnosed" in text.lower() or "diagnosis is" in text.lower():
             return None
+        # Strip any [entry-XXX] citation that the model invented (not in
+        # our context). Keeping known ones as plain text — render_html
+        # will style them as small monospace pills.
+        known_prefixes = {
+            (e.get("id", "").split("-")[0] or "").lower()
+            for e in (ctx.get("entries") or [])
+        }
+
+        def _scrub(match: re.Match[str]) -> str:
+            prefix = match.group(1).lower()
+            return match.group(0) if prefix in known_prefixes else ""
+
+        text = _CITATION_RE.sub(_scrub, text)
+        # Collapse the double-spaces left by stripped citations.
+        text = re.sub(r"[ \t]{2,}", " ", text).strip()
         return text
     except OllamaError:
         return None
@@ -362,6 +505,9 @@ _HTML_TEMPLATE = """<!doctype html>
   .badge-strong {{ background: #c0392b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; }}
   .badge-moderate {{ background: #d97706; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; }}
   .badge-weak {{ background: #6b7280; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; }}
+  .cite {{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+           font-size: 11px; padding: 1px 6px; border-radius: 4px;
+           background: #eef2ff; color: #4338ca; }}
   @media print {{ body {{ margin: 0; }} h2 {{ page-break-after: avoid; }} }}
 </style>
 </head><body>
@@ -468,6 +614,12 @@ def _inline(s: str) -> str:
     s = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", s)
     s = re.sub(r"_([^_]+)_", r"<em>\1</em>", s)
     s = re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
+    s = re.sub(
+        r"\[entry-([a-f0-9]{4,16})\]",
+        r'<span class="cite">entry-\1</span>',
+        s,
+        flags=re.IGNORECASE,
+    )
     return s
 
 

@@ -1,11 +1,14 @@
-"""Auth endpoints: setup, unlock, lock, status."""
+"""Auth endpoints: setup, unlock, lock, status, heartbeat."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Response, status
+import sqlite3
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from ..config import SESSION_COOKIE, db_path, salt_path
 from ..crypto import derive_key, generate_salt
 from ..db import DBError, create_db, open_db
+from ..deps import require_unlocked
 from ..models import AuthStatus, SetupRequest, UnlockRequest
 from ..session import store
 
@@ -73,4 +76,19 @@ def auth_unlock(body: UnlockRequest, response: Response) -> AuthStatus:
 def auth_lock(response: Response) -> Response:
     store.lock()
     response.delete_cookie(SESSION_COOKIE)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/heartbeat", status_code=status.HTTP_204_NO_CONTENT)
+def auth_heartbeat(
+    _conn: sqlite3.Connection = Depends(require_unlocked),
+) -> Response:
+    """Bump the inactivity timer.
+
+    The dependency itself bumps `last_activity` via `store.get_conn()`, so
+    the body is a no-op. The frontend pings this on real user input
+    (mouse, keyboard, scroll, touch) so the journal only auto-locks after
+    a real period of idleness — not after 15 minutes of wall-clock time
+    while the user reads the brief.
+    """
     return Response(status_code=status.HTTP_204_NO_CONTENT)

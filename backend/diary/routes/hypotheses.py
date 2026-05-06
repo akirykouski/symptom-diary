@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import sqlite3
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -16,9 +15,11 @@ router = APIRouter(tags=["hypotheses"])
 
 
 class HypothesisPatch(BaseModel):
-    status: str | None = None  # active|dismissed|expired|confirmed
+    status: str | None = None  # active|dismissed|expired|confirmed|suppressed
     user_note: str | None = None
     dismissed_reason: str | None = None
+    corroborate_entry_id: str | None = None
+    uncorroborate_entry_id: str | None = None
 
 
 @router.get("/api/hypotheses")
@@ -30,6 +31,14 @@ def list_hypotheses(
     if status == "all":
         return he.list_hypotheses(conn, status=None)
     return he.list_hypotheses(conn, status=status)
+
+
+@router.get("/api/hypotheses/feedback-history")
+def feedback_history(
+    limit: int = Query(50, ge=1, le=500),
+    conn: sqlite3.Connection = Depends(require_unlocked),
+) -> list[dict]:
+    return he.feedback_history(conn, limit=limit)
 
 
 @router.get("/api/hypotheses/{hid}")
@@ -49,6 +58,17 @@ def patch_hypothesis(
     body: HypothesisPatch,
     conn: sqlite3.Connection = Depends(require_unlocked),
 ) -> dict:
+    if body.corroborate_entry_id is not None:
+        ok = he.corroborate_entry(
+            conn, hypothesis_id=hid, entry_id=body.corroborate_entry_id
+        )
+        if not ok:
+            raise HTTPException(status_code=404, detail="hypothesis_or_entry_not_found")
+    if body.uncorroborate_entry_id is not None:
+        he.uncorroborate_entry(
+            conn, hypothesis_id=hid, entry_id=body.uncorroborate_entry_id
+        )
+
     h = he.update_hypothesis_status(
         conn,
         hid,

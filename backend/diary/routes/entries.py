@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from ..db import transaction
-from ..deps import require_unlocked
+from ..deps import require_mobile_or_unlocked, require_unlocked
 from ..extraction import enqueue_job, queue_summary
 from ..models import EntryCreate, EntryOut, EntryUpdate, TagOut
 
@@ -93,7 +93,9 @@ def list_entries(
 
 
 @router.post("", response_model=EntryOut, status_code=status.HTTP_201_CREATED)
-def create_entry(body: EntryCreate, conn: sqlite3.Connection = Depends(require_unlocked)) -> EntryOut:
+def create_entry(
+    body: EntryCreate, conn: sqlite3.Connection = Depends(require_mobile_or_unlocked)
+) -> EntryOut:
     _validate_tags(conn, body.tag_ids)
     entry_id = str(uuid.uuid4())
     now = _now()
@@ -126,6 +128,26 @@ def extraction_queue_status(conn: sqlite3.Connection = Depends(require_unlocked)
     return queue_summary(conn)
 
 
+@router.post("/queue/retry-failed")
+def retry_failed_extraction_jobs(
+    conn: sqlite3.Connection = Depends(require_unlocked),
+) -> dict:
+    """Re-queue every entry whose extraction job failed.
+
+    The "1 failed" badge in the toolbar calls this. Wrapped in `transaction`
+    to keep the flip atomic with respect to the extraction worker, which
+    otherwise could observe a partial mid-update state.
+    """
+    with transaction(conn):
+        cur = conn.execute(
+            "UPDATE extraction_job SET status = 'queued', last_error = NULL, "
+            "updated_at = ? WHERE status = 'failed'",
+            (_now(),),
+        )
+        retried = cur.rowcount
+    return {"retried": retried}
+
+
 @router.get("/{entity_entry_id}/entities")
 def entry_entities(
     entity_entry_id: str,
@@ -154,7 +176,9 @@ def entry_entities(
 
 
 @router.get("/{entry_id}", response_model=EntryOut)
-def get_entry(entry_id: str, conn: sqlite3.Connection = Depends(require_unlocked)) -> EntryOut:
+def get_entry(
+    entry_id: str, conn: sqlite3.Connection = Depends(require_mobile_or_unlocked)
+) -> EntryOut:
     row = conn.execute("SELECT * FROM entry WHERE id = ?", (entry_id,)).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="not_found")

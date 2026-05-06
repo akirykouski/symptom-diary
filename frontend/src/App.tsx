@@ -1,6 +1,7 @@
+import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "./api/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, clearOnLocked, setOnLocked } from "./api/client";
 import Setup from "./pages/Setup";
 import Unlock from "./pages/Unlock";
 import Timeline from "./pages/Timeline";
@@ -17,11 +18,51 @@ import MobilePair from "./pages/MobilePair";
 import SafetyBanner from "./components/SafetyBanner";
 
 export default function App() {
+  const qc = useQueryClient();
   const status = useQuery({
     queryKey: ["auth", "status"],
     queryFn: api.status,
     refetchInterval: 60_000,
   });
+
+  // When any backend call returns 401 detail=locked, refresh the auth
+  // status query so the routing tree flips to /unlock instantly.
+  useEffect(() => {
+    const handler = () => {
+      qc.invalidateQueries({ queryKey: ["auth", "status"] });
+    };
+    setOnLocked(handler);
+    return () => clearOnLocked(handler);
+  }, [qc]);
+
+  // Inactivity heartbeat: while unlocked, ping /api/auth/heartbeat on real
+  // user input (debounced to once per 30s) so the journal only auto-locks
+  // after a real period of idleness — not while the user is reading the
+  // brief or scrolling labs without making other API calls.
+  const unlockedNow = status.data?.unlocked === true;
+  useEffect(() => {
+    if (!unlockedNow || typeof window === "undefined") return;
+    let lastBump = 0;
+    const bump = () => {
+      const t = Date.now();
+      if (t - lastBump < 30_000) return;
+      lastBump = t;
+      api.heartbeat().catch(() => {
+        // ignore — if the call 401s, the locked handler above takes over.
+      });
+    };
+    const events: (keyof WindowEventMap)[] = [
+      "mousemove",
+      "keydown",
+      "click",
+      "touchstart",
+      "scroll",
+    ];
+    for (const e of events) window.addEventListener(e, bump, { passive: true });
+    return () => {
+      for (const e of events) window.removeEventListener(e, bump);
+    };
+  }, [unlockedNow]);
 
   // Mobile-companion routes are open to the phone, which has no desktop
   // session cookie. Skip the auth-gate Routes entirely on `/m/*`.

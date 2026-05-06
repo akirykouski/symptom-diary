@@ -21,6 +21,7 @@ from .routes.hypotheses import router as hypotheses_router
 from .routes.insights import router as insights_router
 from .routes.llm import router as llm_router
 from .routes.media import router as media_router
+from .routes.mobile import router as mobile_router
 from .routes.ollama_admin import router as ollama_admin_router
 from .routes.share import router as share_router
 from .routes.tags import router as tags_router
@@ -66,6 +67,7 @@ app.include_router(demo_router)
 app.include_router(ollama_admin_router)
 app.include_router(bundle_router)
 app.include_router(share_router)
+app.include_router(mobile_router)
 
 
 @app.get("/api/health")

@@ -13,6 +13,30 @@ export class ApiError extends Error {
   }
 }
 
+// When any request returns 401 with detail="locked", we want the App shell to
+// flip to the unlock screen immediately rather than waiting up to 60s for the
+// next /api/auth/status poll. Auth-check paths (/auth/*) opt out — they're
+// expected to 401 on bad passphrases without yanking the user away.
+type LockedHandler = () => void;
+let onLocked: LockedHandler | null = null;
+export function setOnLocked(handler: LockedHandler | null): void {
+  onLocked = handler;
+}
+export function clearOnLocked(handler: LockedHandler): void {
+  // Only clear if we still own the slot — guards against React Strict Mode
+  // double-invoking effects (mount → cleanup → mount), where a naive
+  // setOnLocked(null) in cleanup would clobber a fresh registration from
+  // the second mount.
+  if (onLocked === handler) onLocked = null;
+}
+
+function looksLikeLockResponse(path: string, data: unknown): boolean {
+  if (path.startsWith("/api/auth/")) return false;
+  if (!data || typeof data !== "object") return false;
+  const detail = (data as { detail?: unknown }).detail;
+  return detail === "locked";
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -29,6 +53,9 @@ async function request<T>(
   const text = await r.text();
   const data = text ? safeJson(text) : null;
   if (!r.ok) {
+    if (r.status === 401 && looksLikeLockResponse(path, data) && onLocked) {
+      onLocked();
+    }
     throw new ApiError(r.status, data);
   }
   return data as T;
@@ -82,6 +109,7 @@ export const api = {
   unlock: (passphrase: string) =>
     request<AuthStatus>("POST", "/api/auth/unlock", { passphrase }),
   lock: () => request<void>("POST", "/api/auth/lock"),
+  heartbeat: () => request<void>("POST", "/api/auth/heartbeat"),
 
   // entries
   listEntries: (params?: { from?: string; to?: string; tag?: string }) => {
@@ -145,6 +173,8 @@ export const api = {
     request<{ status: string }>("POST", `/api/entries/${id}/reextract`),
   queueStatus: () =>
     request<QueueStatus>("GET", "/api/entries/queue/status"),
+  retryFailedJobs: () =>
+    request<{ retried: number }>("POST", "/api/entries/queue/retry-failed"),
   entryEntities: (id: string) =>
     request<EntryEntity[]>("GET", `/api/entries/${id}/entities`),
 

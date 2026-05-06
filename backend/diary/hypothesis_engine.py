@@ -49,6 +49,17 @@ STRONG_THRESHOLD = 1.6           # aggregate score → strong signal
 MODERATE_THRESHOLD = 0.9         # aggregate score → moderate signal
 EXPIRY_DAYS = 30
 
+# Learning loop — see migration 005_learning.sql.
+#   DISMISSAL_COOLDOWN_DAYS: how long a dismissal suppresses re-surfacing.
+#   RESURFACE_FACTOR: the new aggregate score must exceed the score-at-dismissal
+#     by this multiplier before we re-promote a dismissed hypothesis to active.
+#   CONFIRMED_BOOST: multiplicative bump applied to disease scores when the
+#     user has confirmed the hypothesis once before — enough to flip an
+#     edge-case weak/moderate but not enough to fabricate strong signals.
+DISMISSAL_COOLDOWN_DAYS = 60
+RESURFACE_FACTOR = 1.30
+CONFIRMED_BOOST = 1.25
+
 
 # ---------- data classes ------------------------------------------------------
 
@@ -484,6 +495,56 @@ async def write_rationale(
 # ---------- step 5: persist ---------------------------------------------------
 
 
+def _recent_dismissals(conn: sqlite3.Connection) -> dict[str, tuple[str, float]]:
+    """Map disease_id -> (recorded_at_iso, score_at_action) for dismissals
+    inside the cooldown window. If a user has dismissed the same disease
+    multiple times, the *most recent* dismissal wins (a fresh dismissal
+    re-arms the cooldown)."""
+    cutoff = (
+        datetime.now(timezone.utc) - timedelta(days=DISMISSAL_COOLDOWN_DAYS)
+    ).isoformat()
+    rows = conn.execute(
+        """
+        SELECT disease_id,
+               MAX(recorded_at) AS recorded_at,
+               match_score_at_action
+        FROM hypothesis_feedback
+        WHERE action = 'dismissed' AND recorded_at >= ?
+        GROUP BY disease_id
+        """,
+        (cutoff,),
+    ).fetchall()
+    out: dict[str, tuple[str, float]] = {}
+    for r in rows:
+        # The grouped query returns MAX(recorded_at) but the score column is
+        # the score from *some* row — use the same row by re-selecting.
+        latest = conn.execute(
+            """
+            SELECT recorded_at, match_score_at_action
+            FROM hypothesis_feedback
+            WHERE disease_id = ? AND action = 'dismissed'
+            ORDER BY recorded_at DESC LIMIT 1
+            """,
+            (r["disease_id"],),
+        ).fetchone()
+        if latest is not None:
+            out[r["disease_id"]] = (
+                latest["recorded_at"],
+                float(latest["match_score_at_action"]),
+            )
+    return out
+
+
+def _confirmed_diseases(conn: sqlite3.Connection) -> set[str]:
+    """All disease ids the user has at any point confirmed. Confirmation is
+    persistent — a confirmed hypothesis keeps its boost until explicitly
+    unset (we don't currently expose unsetting)."""
+    rows = conn.execute(
+        "SELECT DISTINCT disease_id FROM hypothesis_feedback WHERE action = 'confirmed'"
+    ).fetchall()
+    return {r["disease_id"] for r in rows}
+
+
 async def recheck(conn: sqlite3.Connection, *, llm: OllamaClient | None) -> dict[str, int]:
     """Run the full pipeline and persist new hypothesis rows."""
     signals = build_fingerprint(conn)
@@ -492,11 +553,22 @@ async def recheck(conn: sqlite3.Connection, *, llm: OllamaClient | None) -> dict
     # Soft floor: anything above this is worth surfacing (it'll be a "weak" signal,
     # but the user can still see we noticed it). Strong/moderate cuts are higher up.
     candidates = [c for c in candidates if c.score >= 0.3]
+
+    # Apply learning-loop adjustments BEFORE the top-N cut so confirmed
+    # diseases that were previously borderline get a fair shot at the list.
+    confirmed = _confirmed_diseases(conn)
+    for c in candidates:
+        if c.disease_id in confirmed:
+            c.score *= CONFIRMED_BOOST
+    candidates.sort(key=lambda c: c.score, reverse=True)
     candidates = candidates[:TOP_DISEASES]
+
+    dismissed = _recent_dismissals(conn)
 
     now = _now()
     expires = (datetime.now(timezone.utc) + timedelta(days=EXPIRY_DAYS)).isoformat()
     inserted = 0
+    suppressed = 0
 
     # Expire stale active hypotheses (data age moved past the window).
     conn.execute(
@@ -507,7 +579,18 @@ async def recheck(conn: sqlite3.Connection, *, llm: OllamaClient | None) -> dict
 
     for c in candidates:
         bucket = signal_bucket(c.score)
-        if bucket == "weak":
+
+        # Learning loop: if this disease was recently dismissed and the new
+        # score hasn't grown by RESURFACE_FACTOR, write the row as
+        # 'suppressed' instead of 'active'. The UI shows suppressed rows in
+        # a separate "you dismissed these" subsection.
+        target_status = "active"
+        if c.disease_id in dismissed:
+            _, dismissed_score = dismissed[c.disease_id]
+            if c.score < dismissed_score * RESURFACE_FACTOR:
+                target_status = "suppressed"
+
+        if target_status == "active" and bucket == "weak":
             # Keep only weak hypotheses that aren't already represented.
             existing = conn.execute(
                 "SELECT id FROM hypothesis WHERE disease_id = ? AND status = 'active'",
@@ -526,11 +609,11 @@ async def recheck(conn: sqlite3.Connection, *, llm: OllamaClient | None) -> dict
         rationale = await write_rationale(c, profile_dict, llm=llm)
         actions = _suggested_actions(profile_dict)
 
-        # Replace any prior active row for this disease so we always have the
-        # freshest evidence.
+        # Replace any prior active/suppressed row for this disease so we
+        # always have the freshest evidence.
         conn.execute(
             "UPDATE hypothesis SET status = 'expired' "
-            "WHERE disease_id = ? AND status = 'active'",
+            "WHERE disease_id = ? AND status IN ('active', 'suppressed')",
             (c.disease_id,),
         )
 
@@ -541,7 +624,7 @@ async def recheck(conn: sqlite3.Connection, *, llm: OllamaClient | None) -> dict
                cited_entry_ids, cited_lab_value_ids, cited_medication_ids,
                matched_features, suggested_actions_md, status, generated_at,
                expires_at, user_note, dismissed_reason)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, NULL, NULL)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
             """,
             (
                 str(uuid.uuid4()),
@@ -563,15 +646,20 @@ async def recheck(conn: sqlite3.Connection, *, llm: OllamaClient | None) -> dict
                     for m in c.matched[:10]
                 ]),
                 actions,
+                target_status,
                 now,
                 expires,
             ),
         )
-        inserted += 1
+        if target_status == "active":
+            inserted += 1
+        else:
+            suppressed += 1
 
     return {
         "candidates_considered": len(candidates),
         "hypotheses_written": inserted,
+        "hypotheses_suppressed": suppressed,
         "user_signals": len(signals),
     }
 
@@ -585,21 +673,26 @@ def list_hypotheses(
     status: str | None = "active",
 ) -> list[dict]:
     sql = (
-        "SELECT h.*, d.name AS disease_name, d.category, d.source_url, d.red_flag "
+        "SELECT h.*, d.name AS disease_name, d.category, d.source_url, d.red_flag, "
+        "       (SELECT 1 FROM hypothesis_feedback hf "
+        "        WHERE hf.disease_id = h.disease_id AND hf.action = 'confirmed' "
+        "        LIMIT 1) AS user_confirmed "
         "FROM hypothesis h JOIN disease_profile d ON d.id = h.disease_id"
     )
     params: list[Any] = []
     if status:
         sql += " WHERE h.status = ?"
         params.append(status)
-    sql += " ORDER BY CASE h.signal_strength "
-    sql += "  WHEN 'strong' THEN 0 WHEN 'moderate' THEN 1 ELSE 2 END, h.match_score DESC"
+    # Confirmed hypotheses pin to the top regardless of signal bucket.
+    sql += " ORDER BY (user_confirmed IS NOT NULL) DESC, "
+    sql += "  CASE h.signal_strength WHEN 'strong' THEN 0 WHEN 'moderate' THEN 1 ELSE 2 END, "
+    sql += "  h.match_score DESC"
     rows = conn.execute(sql, params).fetchall()
-    return [_hydrate_row(r) for r in rows]
+    return [_hydrate_row(r, conn) for r in rows]
 
 
-def _hydrate_row(row: sqlite3.Row) -> dict:
-    return {
+def _hydrate_row(row: sqlite3.Row, conn: sqlite3.Connection | None = None) -> dict:
+    payload = {
         "id": row["id"],
         "disease_id": row["disease_id"],
         "disease_name": row["disease_name"],
@@ -619,17 +712,54 @@ def _hydrate_row(row: sqlite3.Row) -> dict:
         "expires_at": row["expires_at"],
         "user_note": row["user_note"],
         "dismissed_reason": row["dismissed_reason"],
+        "corroborated_entry_ids": [],
+        "user_confirmed": False,
     }
+    # Optional sort-helper column: True when the user has confirmed this
+    # disease at any point. Surface it in the payload so the UI can pin a ★.
+    try:
+        payload["user_confirmed"] = bool(row["user_confirmed"])
+    except (KeyError, IndexError):
+        pass
+    if conn is not None:
+        payload["corroborated_entry_ids"] = corroborated_entry_ids(conn, row["id"])
+    return payload
 
 
 def get_hypothesis(conn: sqlite3.Connection, hid: str) -> dict | None:
     row = conn.execute(
-        "SELECT h.*, d.name AS disease_name, d.category, d.source_url, d.red_flag "
+        "SELECT h.*, d.name AS disease_name, d.category, d.source_url, d.red_flag, "
+        "       (SELECT 1 FROM hypothesis_feedback hf "
+        "        WHERE hf.disease_id = h.disease_id AND hf.action = 'confirmed' "
+        "        LIMIT 1) AS user_confirmed "
         "FROM hypothesis h JOIN disease_profile d ON d.id = h.disease_id "
         "WHERE h.id = ?",
         (hid,),
     ).fetchone()
-    return _hydrate_row(row) if row is not None else None
+    return _hydrate_row(row, conn) if row is not None else None
+
+
+_VALID_STATUSES = {"active", "dismissed", "expired", "confirmed", "suppressed"}
+_FEEDBACK_ACTIONS = {"dismissed": "dismissed", "confirmed": "confirmed", "active": "reactivated"}
+
+
+def _record_feedback(
+    conn: sqlite3.Connection,
+    *,
+    hypothesis_id: str,
+    disease_id: str,
+    action: str,
+    reason: str | None,
+    score: float,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO hypothesis_feedback
+          (id, hypothesis_id, disease_id, action, reason, recorded_at, match_score_at_action)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (str(uuid.uuid4()), hypothesis_id, disease_id, action, reason, _now(), score),
+    )
 
 
 def update_hypothesis_status(
@@ -640,17 +770,94 @@ def update_hypothesis_status(
     user_note: str | None = None,
     dismissed_reason: str | None = None,
 ) -> dict | None:
+    current = conn.execute(
+        "SELECT id, disease_id, status, match_score FROM hypothesis WHERE id = ?",
+        (hid,),
+    ).fetchone()
+    if current is None:
+        return None
+
     fields: dict[str, Any] = {}
     if status is not None:
-        if status not in {"active", "dismissed", "expired", "confirmed"}:
+        if status not in _VALID_STATUSES:
             return None
         fields["status"] = status
     if user_note is not None:
         fields["user_note"] = user_note
     if dismissed_reason is not None:
         fields["dismissed_reason"] = dismissed_reason
-    if not fields:
-        return get_hypothesis(conn, hid)
-    assigns = ", ".join(f"{k} = ?" for k in fields)
-    conn.execute(f"UPDATE hypothesis SET {assigns} WHERE id = ?", [*fields.values(), hid])
+
+    if fields:
+        assigns = ", ".join(f"{k} = ?" for k in fields)
+        conn.execute(
+            f"UPDATE hypothesis SET {assigns} WHERE id = ?", [*fields.values(), hid]
+        )
+
+    # Learning loop: any user-driven status change is recorded as feedback.
+    # We don't log internal transitions (e.g. recheck() expiring stale rows)
+    # because those don't go through this function.
+    if status is not None and status != current["status"]:
+        action = _FEEDBACK_ACTIONS.get(status)
+        if action is not None:
+            _record_feedback(
+                conn,
+                hypothesis_id=hid,
+                disease_id=current["disease_id"],
+                action=action,
+                reason=dismissed_reason,
+                score=float(current["match_score"]),
+            )
+
     return get_hypothesis(conn, hid)
+
+
+# ---------- corroboration -----------------------------------------------------
+
+
+def corroborate_entry(conn: sqlite3.Connection, *, hypothesis_id: str, entry_id: str) -> bool:
+    """Mark an entry as 'doctor agreed this matters' for a given hypothesis.
+
+    Returns False if the hypothesis or entry id doesn't exist; otherwise True
+    (idempotent — the primary key prevents duplicates)."""
+    h = conn.execute("SELECT id FROM hypothesis WHERE id = ?", (hypothesis_id,)).fetchone()
+    if h is None:
+        return False
+    e = conn.execute("SELECT id FROM entry WHERE id = ?", (entry_id,)).fetchone()
+    if e is None:
+        return False
+    conn.execute(
+        "INSERT OR IGNORE INTO entry_corroboration (entry_id, hypothesis_id, recorded_at) "
+        "VALUES (?, ?, ?)",
+        (entry_id, hypothesis_id, _now()),
+    )
+    return True
+
+
+def uncorroborate_entry(conn: sqlite3.Connection, *, hypothesis_id: str, entry_id: str) -> None:
+    conn.execute(
+        "DELETE FROM entry_corroboration WHERE hypothesis_id = ? AND entry_id = ?",
+        (hypothesis_id, entry_id),
+    )
+
+
+def corroborated_entry_ids(conn: sqlite3.Connection, hypothesis_id: str) -> list[str]:
+    rows = conn.execute(
+        "SELECT entry_id FROM entry_corroboration WHERE hypothesis_id = ? ORDER BY recorded_at",
+        (hypothesis_id,),
+    ).fetchall()
+    return [r["entry_id"] for r in rows]
+
+
+def feedback_history(conn: sqlite3.Connection, *, limit: int = 50) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT f.id, f.hypothesis_id, f.disease_id, f.action, f.reason,
+               f.recorded_at, f.match_score_at_action,
+               d.name AS disease_name, d.category
+        FROM hypothesis_feedback f
+        JOIN disease_profile d ON d.id = f.disease_id
+        ORDER BY f.recorded_at DESC LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    return [dict(r) for r in rows]
