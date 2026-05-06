@@ -35,6 +35,19 @@ async def _build_intro(ctx: dict, *, enrich: bool) -> str | None:
     return await brief.maybe_intro(ctx, llm=OllamaClient())
 
 
+def _strip_html_only_markers(md: str) -> str:
+    """Remove the `<!--BEGIN-WEAK -->` / `<!--END-WEAK-->` lines that the
+    HTML pipeline turns into <details> wrappers. They have no meaning in the
+    raw markdown shown in the in-app preview pane."""
+    out: list[str] = []
+    for line in md.split("\n"):
+        s = line.strip()
+        if s.startswith("<!--BEGIN-WEAK") or s == "<!--END-WEAK-->":
+            continue
+        out.append(line)
+    return "\n".join(out)
+
+
 @router.post("/api/insights/brief")
 async def post_brief(
     body: BriefRequest,
@@ -44,7 +57,7 @@ async def post_brief(
     intro = await _build_intro(ctx, enrich=body.enrich)
     md = brief.render_markdown(ctx, intro=intro)
     return {
-        "markdown": md,
+        "markdown": _strip_html_only_markers(md),
         "stats": {
             "entries": len(ctx["entries"]),
             "documents": len(ctx["documents"]),

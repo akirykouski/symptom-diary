@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import sqlite3
 import struct
 import uuid
@@ -36,6 +37,7 @@ ENTITY_TYPES = {
     "trigger",
     "bodypart",
     "med",
+    "lab_marker",
     "food",
     "activity",
     "emotion",
@@ -45,6 +47,60 @@ ENTITY_TYPES = {
 EXTRACTION_SYSTEM_PROMPT = (
     "You extract structured medical journal entities from a diary entry.\n"
     "Output STRICT JSON only — no prose, no markdown, no code fences.\n"
+    "When the entity is a lab test or biomarker (e.g. ANA, C3, hemoglobin, "
+    "ferritin, TSH, anti-dsDNA, CRP, ESR), use type='lab_marker' — NOT 'med'. "
+    "Reserve 'med' for prescribed or over-the-counter pharmaceuticals.\n"
+)
+
+
+# Curated set of lab tests / biomarkers used to enforce `lab_marker` typing
+# even if the LLM tags them as `med` or `symptom`. Keys are normalized via
+# `_normalize_marker` (lowercase, separators collapsed to a single dash) so
+# variants like "anti dsdna" / "anti-dsDNA" / "anti_dsdna" all match.
+_KNOWN_LAB_MARKERS_RAW = (
+    # Autoimmune / complement (the original feedback case)
+    "ana", "ena", "anti-dsdna", "anti-sm", "anti-rnp", "anti-ro", "anti-la",
+    "anti-ccp", "ccp", "rheumatoid factor", "rf", "complement", "c3", "c4",
+    "immunoglobulin", "igg", "iga", "igm", "ige",
+    # Inflammation
+    "crp", "c-reactive protein", "esr", "sed rate",
+    # Hematology
+    "hemoglobin", "hgb", "hb", "hematocrit", "hct", "wbc", "white blood cell count",
+    "rbc", "red blood cell count", "platelets", "plt", "mcv", "mch", "mchc",
+    "rdw", "neutrophils", "lymphocytes", "monocytes", "eosinophils",
+    # Iron
+    "ferritin", "iron", "transferrin", "tibc",
+    # Liver
+    "alt", "ast", "alp", "ggt", "bilirubin", "albumin", "total protein",
+    # Kidney
+    "creatinine", "urea", "bun", "egfr", "gfr",
+    # Electrolytes
+    "sodium", "potassium", "chloride", "calcium", "magnesium", "phosphate",
+    "bicarbonate",
+    # Endocrine / metabolism
+    "glucose", "hba1c", "a1c", "insulin", "tsh", "t3", "t4", "free t3", "free t4",
+    "ft3", "ft4",
+    # Lipids
+    "cholesterol", "hdl", "ldl", "triglycerides",
+    # Vitamins
+    "b12", "folate", "vitamin d", "25-oh-d", "25 hydroxyvitamin d",
+    # Coagulation
+    "pt", "inr", "ptt", "aptt", "fibrinogen",
+    # Cardiac
+    "troponin", "bnp", "nt-probnp",
+    # Other
+    "ldh", "lipase", "amylase", "ck", "ck-mb",
+    # Tumor markers
+    "psa", "ca-125", "cea", "afp",
+)
+
+
+def _normalize_marker(s: str) -> str:
+    return re.sub(r"[\s\-_/]+", "-", s.strip().lower())
+
+
+KNOWN_LAB_MARKERS: frozenset[str] = frozenset(
+    _normalize_marker(m) for m in _KNOWN_LAB_MARKERS_RAW
 )
 
 EXTRACTION_SCHEMA = {
@@ -74,9 +130,12 @@ EXTRACTION_SCHEMA = {
 def _build_prompt(text_md: str, ts_recorded: str) -> str:
     return (
         "Schema:\n"
-        '{ "entities": [{"type":"symptom|trigger|bodypart|med|food|activity|emotion|other",'
+        '{ "entities": [{"type":"symptom|trigger|bodypart|med|lab_marker|food|activity|emotion|other",'
         ' "name":"lowercase canonical","attrs":{"severity"?:0-10,"body_part"?:string,"modifier"?:string}}],'
         ' "ts_event_hint": "ISO8601 if user mentioned a relative time, else null" }\n'
+        "Use `lab_marker` for lab tests / biomarkers (ANA, C3, hemoglobin, "
+        "ferritin, TSH, anti-dsDNA, CRP, ESR …). Use `med` only for actual "
+        "drugs / prescriptions / OTC medications.\n"
         f"Current time: {ts_recorded}.\n"
         "Diary entry follows.\n---\n"
         f"{text_md}\n"
@@ -134,6 +193,11 @@ def _parse_response(payload: dict) -> tuple[list[ExtractedEntity], str | None]:
         name = (item.get("name") or "").strip().lower()
         if not name or etype not in ENTITY_TYPES:
             continue
+        # Defense-in-depth: even if the LLM mistypes a known lab marker as
+        # `med` or `symptom`, force it back to `lab_marker` so the brief's
+        # symptom filter and the medication section stay clean.
+        if _normalize_marker(name) in KNOWN_LAB_MARKERS:
+            etype = "lab_marker"
         attrs = item.get("attrs") if isinstance(item.get("attrs"), dict) else {}
         out.append(ExtractedEntity(type=etype, name=name, attrs=attrs))
 
