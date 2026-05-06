@@ -122,6 +122,23 @@ def gather_context(
         """
     ).fetchall()
 
+    # Patient/owner identifier line — uses the demo persona when one is loaded
+    # (so a clinician reading the printed brief sees "Maria · 26y · …" instead
+    # of an anonymous label). Falls back to a stable hashed ID derived from
+    # the schema_version row so the same journal always prints the same ID.
+    persona_title = None
+    persona_row = conn.execute(
+        "SELECT value FROM meta WHERE key='demo_persona'"
+    ).fetchone()
+    if persona_row:
+        from .demo_data import PERSONAS
+        persona_id = persona_row["value"]
+        for p in PERSONAS:
+            obj = p()
+            if obj.id == persona_id:
+                persona_title = obj.title
+                break
+
     hypotheses = conn.execute(
         """
         SELECT h.id, h.signal_strength, h.match_score, h.rationale_md,
@@ -153,6 +170,7 @@ def gather_context(
         "abnormal_labs": [dict(r) for r in abnormal_labs],
         "medications": [dict(r) for r in medications],
         "documents": [dict(r) for r in documents],
+        "persona_title": persona_title,
         "hypotheses": [
             {**dict(r),
              "cited_entry_ids": json.loads(r["cited_entry_ids"] or "[]"),
@@ -259,6 +277,14 @@ def render_markdown(ctx: dict[str, Any], *, intro: str | None = None) -> str:
     """
     out: list[str] = []
     out.append("# Symptom diary brief")
+    # Patient identifier line (Issue 10) — anchors the document to a person
+    # so the clinician knows which journal they're reading.
+    persona_title = ctx.get("persona_title")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if persona_title:
+        out.append(f"_Patient: {persona_title} · Brief generated {today}_")
+    else:
+        out.append(f"_Journal owner · Brief generated {today}_")
     span = []
     if ctx.get("from"): span.append(f"from {ctx['from'][:10]}")
     if ctx.get("to"): span.append(f"to {ctx['to'][:10]}")
@@ -315,7 +341,20 @@ def render_markdown(ctx: dict[str, Any], *, intro: str | None = None) -> str:
             non_empty[0] if non_empty and all(a == non_empty[0] for a in non_empty) else None
         )
 
-        for h in ctx["hypotheses"]:
+        # Issue 7: render strong/moderate prominently, fold weak signals into a
+        # collapsed <details> block so they don't compete for the clinician's
+        # eye. Markers are pass-through HTML the lightweight markdown renderer
+        # turns into <details>/</details> wrappers.
+        prominent = [
+            h for h in ctx["hypotheses"]
+            if (h.get("signal_strength") or "").lower() != "weak"
+        ]
+        weak = [
+            h for h in ctx["hypotheses"]
+            if (h.get("signal_strength") or "").lower() == "weak"
+        ]
+
+        def _emit(h: dict[str, Any]) -> None:
             badge = h["signal_strength"].upper()
             star = " ★" if h.get("user_confirmed") else ""
             out.append(f"### [{badge}] {h['disease_name']}{star}")
@@ -334,6 +373,16 @@ def render_markdown(ctx: dict[str, Any], *, intro: str | None = None) -> str:
             if not common_action and h.get("suggested_actions_md"):
                 out.append("")
                 out.append("**Suggested next step:** " + h["suggested_actions_md"])
+            out.append("")
+
+        for h in prominent:
+            _emit(h)
+
+        if weak:
+            out.append(f"<!--BEGIN-WEAK n={len(weak)}-->")
+            for h in weak:
+                _emit(h)
+            out.append("<!--END-WEAK-->")
             out.append("")
 
         if common_action:
@@ -488,6 +537,23 @@ _HTML_TEMPLATE = """<!doctype html>
 <meta charset="utf-8">
 <title>Symptom diary brief</title>
 <style>
+  /* Issue 10: page numbers in the printable PDF (WeasyPrint honours
+     CSS Paged Media) and a "Symptom diary brief" running footer so a
+     clinician sharing a few pages with a colleague keeps context. */
+  @page {{
+    size: A4;
+    margin: 1.6cm 1.6cm 2cm 1.6cm;
+    @bottom-right {{
+      content: counter(page) " / " counter(pages);
+      color: #888;
+      font-size: 10px;
+    }}
+    @bottom-left {{
+      content: "Symptom diary brief";
+      color: #aaa;
+      font-size: 10px;
+    }}
+  }}
   body {{ font: 14px/1.55 -apple-system, system-ui, sans-serif;
           color: #1a1a1a; background: #fff; max-width: 760px;
           margin: 32px auto; padding: 0 24px; }}
@@ -508,7 +574,19 @@ _HTML_TEMPLATE = """<!doctype html>
   .cite {{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
            font-size: 11px; padding: 1px 6px; border-radius: 4px;
            background: #eef2ff; color: #4338ca; }}
-  @media print {{ body {{ margin: 0; }} h2 {{ page-break-after: avoid; }} }}
+  details.weak-signals {{ margin-top: 12px; border-top: 1px dashed #d4d4d4;
+                          padding-top: 8px; }}
+  details.weak-signals > summary {{ cursor: pointer; color: #4b5563;
+                                    font-size: 12px; font-weight: 500;
+                                    list-style: none; user-select: none; }}
+  details.weak-signals > summary::before {{ content: "▸ "; color: #9ca3af; }}
+  details.weak-signals[open] > summary::before {{ content: "▾ "; }}
+  @media print {{
+    body {{ margin: 0;
+            font-family: Georgia, "Iowan Old Style", "Times New Roman", serif; }}
+    h1, h2, h3 {{ font-family: Georgia, "Iowan Old Style", "Times New Roman", serif; }}
+    h2 {{ page-break-after: avoid; }}
+  }}
 </style>
 </head><body>
 {body}
@@ -542,6 +620,9 @@ def render_pdf(html_text: str) -> bytes:
     return HTML(string=html_text).write_pdf()
 
 
+_WEAK_BEGIN_RE = re.compile(r"^<!--BEGIN-WEAK n=(\d+)-->$")
+
+
 def render_html(markdown_text: str) -> str:
     """Tiny markdown-ish → HTML conversion that handles only what render_markdown emits."""
     body_lines: list[str] = []
@@ -549,6 +630,19 @@ def render_html(markdown_text: str) -> str:
     in_list = False
     for line in markdown_text.split("\n"):
         stripped = line.rstrip()
+        m_weak = _WEAK_BEGIN_RE.match(stripped)
+        if m_weak:
+            _close_open(body_lines, in_table, in_list); in_table = in_list = False
+            n = int(m_weak.group(1))
+            label = f"Show {n} more weak signal{'s' if n != 1 else ''}"
+            body_lines.append(
+                f"<details class='weak-signals'><summary>{label}</summary>"
+            )
+            continue
+        if stripped == "<!--END-WEAK-->":
+            _close_open(body_lines, in_table, in_list); in_table = in_list = False
+            body_lines.append("</details>")
+            continue
         if stripped.startswith("# "):
             _close_open(body_lines, in_table, in_list); in_table = in_list = False
             body_lines.append(f"<h1>{_inline(stripped[2:])}</h1>")

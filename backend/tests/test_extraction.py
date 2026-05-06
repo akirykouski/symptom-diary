@@ -83,6 +83,41 @@ async def test_extraction_pipeline_creates_entities_and_edges(client: TestClient
 
 
 @pytest.mark.asyncio
+async def test_lab_markers_retyped_even_when_llm_says_med(client: TestClient) -> None:
+    """Issue 8: ANA / C3 / hemoglobin must land as `lab_marker`, not `med`."""
+    _setup_client(client)
+    r = client.post(
+        "/api/entries",
+        json={
+            "ts_event": "2026-05-03T08:00:00+00:00",
+            "text_md": "Doctor visit — ANA positive, C3 low, hemoglobin 11.",
+            "tag_ids": [],
+        },
+    )
+    assert r.status_code == 201
+    eid = r.json()["id"]
+
+    fake = FakeLLM({
+        "doctor visit": [
+            {"type": "med", "name": "ana", "attrs": {}},
+            {"type": "med", "name": "c3", "attrs": {}},
+            {"type": "symptom", "name": "hemoglobin", "attrs": {}},
+            {"type": "med", "name": "hydroxychloroquine", "attrs": {}},
+        ],
+    })
+    conn = store.peek_conn()
+    assert conn is not None
+    await extraction.process_one(conn, entry_id=eid, llm=fake)  # type: ignore[arg-type]
+
+    entities = {e["canonical_name"]: e["type"] for e in client.get("/api/entities").json()}
+    assert entities.get("ana") == "lab_marker"
+    assert entities.get("c3") == "lab_marker"
+    assert entities.get("hemoglobin") == "lab_marker"
+    # A real medication stays a med — defense-in-depth must not over-trigger.
+    assert entities.get("hydroxychloroquine") == "med"
+
+
+@pytest.mark.asyncio
 async def test_canonicalization_links_aliases(client: TestClient) -> None:
     _setup_client(client)
     r1 = client.post(
