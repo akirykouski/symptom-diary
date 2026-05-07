@@ -42,7 +42,20 @@ logger = logging.getLogger("diary.hypothesis")
 # ---------- thresholds --------------------------------------------------------
 
 ACTIVE_WINDOW_DAYS = 180
-PER_FEATURE_FLOOR = 0.45         # similarity floor below which we ignore a match
+# Kind-aware similarity floors. Symptom/sign features arrive as colloquial
+# diary phrasing ("sores in mouth") that often falls just below the lab-tuned
+# 0.45 threshold even when an alias would clearly resolve the match. We lower
+# the bar for those kinds and rely on aliases + frequency_weight to keep
+# precision; lab_pattern stays at the original tighter floor because lab
+# vocabulary is already canonical.
+PER_FEATURE_FLOOR_BY_KIND = {
+    "symptom": 0.32,
+    "sign": 0.32,
+    "temporal": 0.32,
+    "lab_pattern": 0.45,
+    "imaging": 0.40,
+}
+PER_FEATURE_FLOOR_DEFAULT = 0.40
 TOP_K_PER_FEATURE = 3            # how many disease features compete per user signal
 TOP_DISEASES = 8                 # how many diseases reach the LLM step
 STRONG_THRESHOLD = 1.6           # aggregate score → strong signal
@@ -269,9 +282,23 @@ async def match_signals(
         for f in features:
             if have_embeddings and s.embedding and f["embedding"]:
                 sim = _cosine(s.embedding, f["embedding"])
+                # Aliases let "sores in mouth" reach "oral ulcers" without
+                # demanding tight cosine on the formal term.
+                for _alias_text, alias_emb in f.get("aliases") or []:
+                    if alias_emb:
+                        s_alias = _cosine(s.embedding, alias_emb)
+                        if s_alias > sim:
+                            sim = s_alias
             else:
                 sim = _keyword_similarity(s.text, f["feature_name"])
-            if sim >= PER_FEATURE_FLOOR:
+                for alias_text, _ in f.get("aliases") or []:
+                    s_alias = _keyword_similarity(s.text, alias_text)
+                    if s_alias > sim:
+                        sim = s_alias
+            floor = PER_FEATURE_FLOOR_BY_KIND.get(
+                f.get("feature_kind") or "", PER_FEATURE_FLOOR_DEFAULT
+            )
+            if sim >= floor:
                 scored.append((sim, f))
         scored.sort(reverse=True, key=lambda x: x[0])
         for sim, f in scored[:TOP_K_PER_FEATURE]:
