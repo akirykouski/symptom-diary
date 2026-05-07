@@ -88,8 +88,10 @@ async def ingest_seed(
     """
     seed = load_seed()
     diseases = seed.get("diseases", [])
+    shared_aliases: dict[str, list[str]] = seed.get("shared_feature_aliases", {})
     inserted_d = 0
     inserted_f = 0
+    inserted_aliases = 0
     embed_failures = 0
     now = _now()
 
@@ -156,6 +158,26 @@ async def ingest_seed(
                     ),
                 )
                 inserted_f += 1
+                # Merge per-feature aliases with the shared alias map keyed by
+                # canonical feature name; dedup case-insensitively while keeping
+                # original casing of the first occurrence.
+                merged: list[str] = []
+                seen: set[str] = set()
+                for a in (
+                    list(shared_aliases.get(f["name"], []))
+                    + list(f.get("aliases", []))
+                ):
+                    key = a.lower().strip()
+                    if key and key != f["name"].lower() and key not in seen:
+                        seen.add(key)
+                        merged.append(a)
+                for alias in merged:
+                    conn.execute(
+                        "INSERT INTO disease_feature_alias "
+                        "(id, feature_id, alias_text, embedding) VALUES (?, ?, ?, NULL)",
+                        (str(uuid.uuid4()), fid, alias),
+                    )
+                    inserted_aliases += 1
         conn.execute("COMMIT")
     except Exception:
         conn.execute("ROLLBACK")
@@ -165,7 +187,9 @@ async def ingest_seed(
         return {
             "inserted_diseases": inserted_d,
             "inserted_features": inserted_f,
+            "inserted_aliases": inserted_aliases,
             "embedded_features": 0,
+            "embedded_aliases": 0,
             "embed_failures": embed_failures,
         }
 
@@ -174,6 +198,7 @@ async def ingest_seed(
         "SELECT id, feature_name FROM disease_feature WHERE embedding IS NULL"
     ).fetchall()
     embedded = 0
+    bailed_out = False
     for row in rows:
         try:
             vec = await llm.embed(row["feature_name"])
@@ -182,6 +207,7 @@ async def ingest_seed(
             logger.warning("kb embed failed for %s: %s", row["feature_name"], e)
             # If Ollama is fully offline, bail out — let the user re-sync later.
             if "unreachable" in str(e).lower():
+                bailed_out = True
                 break
             continue
         conn.execute(
@@ -198,10 +224,37 @@ async def ingest_seed(
         # Yield so other tasks (e.g. a UI poll) can run.
         if embedded % 10 == 0:
             await asyncio.sleep(0)
+
+    # Aliases get the same treatment so symptom matching has a real chance of
+    # bridging colloquial diary phrasing to formal feature names.
+    embedded_aliases = 0
+    if not bailed_out:
+        alias_rows = conn.execute(
+            "SELECT id, alias_text FROM disease_feature_alias WHERE embedding IS NULL"
+        ).fetchall()
+        for row in alias_rows:
+            try:
+                vec = await llm.embed(row["alias_text"])
+            except OllamaError as e:
+                embed_failures += 1
+                logger.warning("kb alias embed failed for %s: %s", row["alias_text"], e)
+                if "unreachable" in str(e).lower():
+                    break
+                continue
+            conn.execute(
+                "UPDATE disease_feature_alias SET embedding = ? WHERE id = ?",
+                (_pack(vec), row["id"]),
+            )
+            embedded_aliases += 1
+            if embedded_aliases % 20 == 0:
+                await asyncio.sleep(0)
+
     return {
         "inserted_diseases": inserted_d,
         "inserted_features": inserted_f,
+        "inserted_aliases": inserted_aliases,
         "embedded_features": embedded,
+        "embedded_aliases": embedded_aliases,
         "embed_failures": embed_failures,
     }
 
@@ -219,6 +272,14 @@ def all_features(conn: sqlite3.Connection) -> list[dict]:
         JOIN disease_profile d ON d.id = f.disease_id
         """
     ).fetchall()
+    alias_rows = conn.execute(
+        "SELECT feature_id, alias_text, embedding FROM disease_feature_alias"
+    ).fetchall()
+    aliases_by_feature: dict[str, list[tuple[str, list[float] | None]]] = {}
+    for ar in alias_rows:
+        aliases_by_feature.setdefault(ar["feature_id"], []).append(
+            (ar["alias_text"], _unpack(ar["embedding"]) if ar["embedding"] else None)
+        )
     out: list[dict] = []
     for r in rows:
         emb = _unpack(r["embedding"]) if r["embedding"] else None
@@ -233,6 +294,7 @@ def all_features(conn: sqlite3.Connection) -> list[dict]:
             "frequency_class": r["frequency_class"],
             "frequency_weight": FREQUENCY_WEIGHT.get(r["frequency_class"], 0.2),
             "embedding": emb,
+            "aliases": aliases_by_feature.get(r["id"], []),
         })
     return out
 

@@ -160,6 +160,71 @@ async def test_engine_surfaces_lupus_for_maria(client: TestClient) -> None:
     assert "diagnosed" not in top["rationale_md"].lower()
 
 
+@pytest.mark.asyncio
+async def test_aliases_bridge_colloquial_symptoms(client: TestClient) -> None:
+    """Tester feedback round 3: a diary phrase like 'sores in mouth' must match
+    the formal SLE feature 'oral ulcers' via its alias list, even though the
+    two strings have low direct cosine similarity under the fake embedder."""
+    _setup(client)
+    conn = store.peek_conn()
+    assert conn is not None
+
+    # Need at least one entry so the cited_entry_ids list isn't empty.
+    r = client.post(
+        "/api/entries",
+        json={
+            "ts_event": "2026-05-01T08:00:00+00:00",
+            "text_md": "I have painful sores in my mouth and stiff joints today.",
+            "tag_ids": [],
+        },
+    )
+    assert r.status_code == 201
+    entry_id = r.json()["id"]
+
+    # Hand-craft entities so we control the canonical_name (skipping the LLM
+    # extractor). canonical_name uses patient phrasing the engine wouldn't
+    # otherwise match against formal SLE features without the alias path.
+    from datetime import datetime, timezone
+    import uuid as _uuid
+
+    def _add_entity(canonical: str, kind: str = "symptom") -> str:
+        eid = str(_uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            "INSERT INTO entity (id, type, canonical_name, aliases, embedding, "
+            "created_at, updated_at) VALUES (?, ?, ?, '[]', NULL, ?, ?)",
+            (eid, kind, canonical, now, now),
+        )
+        conn.execute(
+            "INSERT INTO entity_mention (id, entry_id, entity_id, confidence) "
+            "VALUES (?, ?, ?, ?)",
+            (str(_uuid.uuid4()), entry_id, eid, 0.9),
+        )
+        return eid
+
+    _add_entity("sores in mouth")
+    _add_entity("stiff joints")
+
+    fake = _FakeLLM()
+    await kb.ingest_seed(conn, llm=fake, embed=True)  # type: ignore[arg-type]
+
+    summary = await he.recheck(conn, llm=fake)  # type: ignore[arg-type]
+    assert summary["user_signals"] >= 2
+    # SLE should appear because both colloquial phrases are aliases of formal
+    # SLE features ("oral ulcers", "joint pain"). Without the alias bridge the
+    # engine would fail to surface lupus from purely symptom-side input.
+    hyps = client.get("/api/hypotheses?status=all").json()
+    diseases = {h["disease_name"]: h for h in hyps}
+    sle = next(
+        (h for h in hyps if "lupus" in h["disease_name"].lower()),
+        None,
+    )
+    assert sle is not None, f"expected SLE in hypotheses; got {list(diseases)}"
+    matched_names = {m["feature_name"] for m in sle["matched_features"]}
+    assert "oral ulcers" in matched_names, matched_names
+    assert "joint pain" in matched_names, matched_names
+
+
 def test_dismiss_hypothesis(client: TestClient) -> None:
     _setup(client)
     client.post("/api/demo/load", json={"persona_id": "maria"})
