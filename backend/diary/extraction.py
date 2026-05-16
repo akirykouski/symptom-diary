@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import sqlite3
 import struct
@@ -25,10 +26,16 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
+import httpx
+
 from .config import ENTITY_LINK_THRESHOLD, LLM_MODEL, PRECEDES_WINDOW_HOURS
-from .db import IntegrityError, transaction
+from .db import IntegrityError, ProgrammingError, transaction
 from .llm import OllamaClient, OllamaError
 from .session import store
+
+# When set, extraction step is delegated to an external HTTP service that wraps
+# the fine-tuned Clario adapter + HPO lookup. Embeddings stay on Ollama.
+EXTRACTOR_URL = os.environ.get("CLARIO_EXTRACTOR_URL", "").rstrip("/")
 
 logger = logging.getLogger("diary.extraction")
 
@@ -315,6 +322,23 @@ def _upsert_edge(
 # ---------- worker entry point ------------------------------------------------
 
 
+async def _call_extractor_sidecar(diary: str, ts_recorded: str) -> dict:
+    """Delegate extraction to the Clario adapter sidecar. Returns the same
+    payload shape that `OllamaClient.generate_json` would (entities + ts_event_hint),
+    so the rest of the pipeline does not have to care which path was used."""
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        try:
+            r = await client.post(
+                f"{EXTRACTOR_URL}/extract",
+                json={"diary": diary, "ts_recorded": ts_recorded},
+            )
+        except (httpx.HTTPError, OSError) as e:
+            raise OllamaError(f"clario extractor unreachable: {e}") from e
+    if r.status_code != 200:
+        raise OllamaError(f"clario extractor {r.status_code}: {r.text}")
+    return r.json()
+
+
 async def process_one(
     conn: sqlite3.Connection,
     *,
@@ -329,12 +353,15 @@ async def process_one(
     if entry is None:
         return
 
-    payload = await llm.generate_json(
-        _build_prompt(entry["text_md"], entry["ts_recorded"]),
-        model=LLM_MODEL,
-        format_schema=EXTRACTION_SCHEMA,
-        system=EXTRACTION_SYSTEM_PROMPT,
-    )
+    if EXTRACTOR_URL:
+        payload = await _call_extractor_sidecar(entry["text_md"], entry["ts_recorded"])
+    else:
+        payload = await llm.generate_json(
+            _build_prompt(entry["text_md"], entry["ts_recorded"]),
+            model=LLM_MODEL,
+            format_schema=EXTRACTION_SCHEMA,
+            system=EXTRACTION_SYSTEM_PROMPT,
+        )
     extracted, ts_hint = _parse_response(payload)
 
     # Embed names in parallel.
@@ -453,8 +480,15 @@ async def worker_loop(*, idle_seconds: float = 1.0) -> None:
 
     llm = OllamaClient()
     logger.info("extraction worker started")
+    # Hold a reference (not just id()) — otherwise a freed conn's address can
+    # be reused by the next one and we'd skip orphan recovery.
+    last_conn: sqlite3.Connection | None = None
     while True:
         try:
+            conn = store.peek_conn()
+            if conn is not None and conn is not last_conn:
+                _recover_orphans(conn)
+                last_conn = conn
             did_media = await _tick_media(llm, media_jobs)
             did_text = await _tick(llm)
             # If we did real work, keep looping fast; otherwise back off.
@@ -468,12 +502,34 @@ async def worker_loop(*, idle_seconds: float = 1.0) -> None:
         await asyncio.sleep(idle_seconds)
 
 
+def _recover_orphans(conn: sqlite3.Connection) -> int:
+    # A job is left in 'running' only when a prior tick crashed mid-flight —
+    # in practice when the session conn closed during an await (auto-lock or
+    # re-unlock under the worker). Called on every fresh conn so the next tick
+    # picks the job up again. process_one is idempotent (replaces mentions).
+    try:
+        cur = conn.execute(
+            "UPDATE extraction_job SET status = 'queued', updated_at = ? "
+            "WHERE status = 'running'",
+            (_now(),),
+        )
+    except ProgrammingError:
+        return 0
+    n = cur.rowcount or 0
+    if n:
+        logger.warning("re-queued %d orphan extraction job(s)", n)
+    return n
+
+
 async def _tick_media(llm: OllamaClient, media_jobs) -> bool:
     conn = store.peek_conn()
     if conn is None:
         return False
     try:
         return await media_jobs.process_one(conn, llm=llm)
+    except ProgrammingError:
+        logger.warning("media tick aborted: session conn changed under worker")
+        return False
     except Exception:  # noqa: BLE001
         logger.exception("media tick failed")
         return False
@@ -483,46 +539,52 @@ async def _tick(llm: OllamaClient) -> bool:
     conn = store.peek_conn()
     if conn is None:
         return False
-    job = conn.execute(
-        "SELECT entry_id, attempts FROM extraction_job "
-        "WHERE status = 'queued' "
-        "ORDER BY created_at ASC LIMIT 1"
-    ).fetchone()
-    if job is None:
-        return False
-    entry_id = job["entry_id"]
-    attempts = job["attempts"]
-    now = _now()
-    conn.execute(
-        "UPDATE extraction_job SET status = 'running', attempts = ?, updated_at = ? "
-        "WHERE entry_id = ?",
-        (attempts + 1, now, entry_id),
-    )
     try:
-        await process_one(conn, entry_id=entry_id, llm=llm)
-    except OllamaError as e:
+        job = conn.execute(
+            "SELECT entry_id, attempts FROM extraction_job "
+            "WHERE status = 'queued' "
+            "ORDER BY created_at ASC LIMIT 1"
+        ).fetchone()
+        if job is None:
+            return False
+        entry_id = job["entry_id"]
+        attempts = job["attempts"]
+        now = _now()
         conn.execute(
-            "UPDATE extraction_job SET status = 'failed', last_error = ?, updated_at = ? "
+            "UPDATE extraction_job SET status = 'running', attempts = ?, updated_at = ? "
             "WHERE entry_id = ?",
-            (str(e), _now(), entry_id),
+            (attempts + 1, now, entry_id),
         )
-        logger.warning("extraction failed for %s: %s", entry_id, e)
-        return True
-    except Exception as e:  # noqa: BLE001
-        conn.execute(
-            "UPDATE extraction_job SET status = 'failed', last_error = ?, updated_at = ? "
-            "WHERE entry_id = ?",
-            (f"{type(e).__name__}: {e}", _now(), entry_id),
-        )
-        logger.exception("extraction crashed for %s", entry_id)
-        return True
+        try:
+            await process_one(conn, entry_id=entry_id, llm=llm)
+        except OllamaError as e:
+            conn.execute(
+                "UPDATE extraction_job SET status = 'failed', last_error = ?, updated_at = ? "
+                "WHERE entry_id = ?",
+                (str(e), _now(), entry_id),
+            )
+            logger.warning("extraction failed for %s: %s", entry_id, e)
+            return True
+        except ProgrammingError:
+            raise  # handled by outer block — job stays 'running', recovered next tick
+        except Exception as e:  # noqa: BLE001
+            conn.execute(
+                "UPDATE extraction_job SET status = 'failed', last_error = ?, updated_at = ? "
+                "WHERE entry_id = ?",
+                (f"{type(e).__name__}: {e}", _now(), entry_id),
+            )
+            logger.exception("extraction crashed for %s", entry_id)
+            return True
 
-    conn.execute(
-        "UPDATE extraction_job SET status = 'done', last_error = NULL, updated_at = ? "
-        "WHERE entry_id = ?",
-        (_now(), entry_id),
-    )
-    return True
+        conn.execute(
+            "UPDATE extraction_job SET status = 'done', last_error = NULL, updated_at = ? "
+            "WHERE entry_id = ?",
+            (_now(), entry_id),
+        )
+        return True
+    except ProgrammingError:
+        logger.warning("extraction tick aborted: session conn changed under worker")
+        return False
 
 
 def enqueue_job(conn: sqlite3.Connection, entry_id: str) -> None:
