@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { OllamaInstallChunk, OllamaSetupMethod, OllamaSetupState } from "../api/client";
 import { api, streamOllamaInstall } from "../api/client";
+import { Icons, Pill } from "../ui/clario";
 
 /**
  * 3-step bootstrap wizard the user lands on at /llm:
@@ -75,7 +76,11 @@ export default function OllamaWizard() {
   }
 
   if (setup.isLoading || !setup.data) {
-    return <div className="text-ink/55 text-sm">{t("ollama.detecting")}</div>;
+    return (
+      <div style={{ fontSize: 13, color: "var(--ink-3)" }}>
+        {t("ollama.detecting", "Detecting Ollama…")}
+      </div>
+    );
   }
 
   const s = setup.data;
@@ -83,19 +88,16 @@ export default function OllamaWizard() {
   const stepDaemonDone = s.daemon_reachable;
 
   return (
-    <div className="space-y-3">
-      <div className="text-xs uppercase tracking-wide text-ink/45">
-        {t("ollama.wizardTitle")}
-      </div>
-
-      <Step
-        index={1}
-        label={t("ollama.step1")}
+    <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+      <WizardStep
+        n={1}
+        title={t("ollama.step1", "Install Ollama")}
         done={stepInstallDone}
-        detail={
+        active={!stepInstallDone}
+        body={
           stepInstallDone
-            ? `${t("ollama.binaryFound")} ${s.binary_path ?? ""}`
-            : `${t("ollama.platform")}: ${prettyPlatform(s.platform)} · ${s.arch}`
+            ? `${t("ollama.binaryFound", "binary found at")} ${s.binary_path ?? ""}`
+            : `${t("ollama.platform", "platform")}: ${prettyPlatform(s.platform)} · ${s.arch}`
         }
       >
         {!stepInstallDone && (
@@ -109,115 +111,140 @@ export default function OllamaWizard() {
             onCancel={() => abortRef.current?.abort()}
           />
         )}
-      </Step>
+      </WizardStep>
 
-      <Step
-        index={2}
-        label={t("ollama.step2")}
+      <WizardStep
+        n={2}
+        title={t("ollama.step2", "Start Ollama")}
         done={stepDaemonDone}
-        detail={
+        active={!stepDaemonDone && stepInstallDone}
+        disabled={!s.binary_present}
+        body={
           stepDaemonDone
             ? s.daemon_managed_pid
-              ? `${t("ollama.daemonRunning")} (managed pid ${s.daemon_managed_pid})`
-              : t("ollama.daemonRunningExternal")
+              ? `${t("ollama.daemonRunning", "Daemon running")} (managed pid ${s.daemon_managed_pid})`
+              : t("ollama.daemonRunningExternal", "Daemon running externally · started outside Clario")
             : s.binary_present
-            ? t("ollama.daemonStopped")
-            : t("ollama.daemonNeedsBinary")
+            ? t("ollama.daemonStopped", "Daemon stopped")
+            : t("ollama.daemonNeedsBinary", "Install binary first")
         }
-        disabled={!s.binary_present}
       >
-        <div className="flex flex-wrap gap-2">
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {!stepDaemonDone && s.binary_present && (
             <button
+              className="btn primary sm"
               onClick={() => start.mutate()}
               disabled={start.isPending}
-              className="bg-accent hover:bg-accent/90 disabled:opacity-50 px-3 py-1.5 rounded-md text-sm"
             >
-              {start.isPending ? t("ollama.starting") : t("ollama.startNow")}
+              {start.isPending
+                ? t("ollama.starting", "Starting…")
+                : t("ollama.startNow", "Start now")}
             </button>
           )}
           {stepDaemonDone && s.daemon_managed_pid && (
             <button
+              className="btn ghost sm"
               onClick={() => stop.mutate()}
               disabled={stop.isPending}
-              className="px-3 py-1.5 rounded-md border border-ink/20 hover:bg-ink/5 text-sm"
             >
-              {t("ollama.stopManaged")}
+              {t("ollama.stopManaged", "Stop managed daemon")}
             </button>
           )}
           {start.error && (
-            <span className="text-xs text-red-300">
+            <span style={{ fontSize: 11.5, color: "var(--danger)" }}>
               {(start.error as Error).message}
             </span>
           )}
           {start.data?.reason === "spawn_unreachable" && (
-            <span className="text-xs text-amber-300">
-              {t("ollama.spawnUnreachable")}
+            <span style={{ fontSize: 11.5, color: "var(--warn)" }}>
+              {t("ollama.spawnUnreachable", "Process started but Ollama did not become reachable.")}
             </span>
           )}
         </div>
-      </Step>
+      </WizardStep>
 
-      <Step
-        index={3}
-        label={t("ollama.step3")}
+      <WizardStep
+        n={3}
+        title={t("ollama.step3", "Pull AI models")}
         done={false}
-        detail={t("ollama.step3Detail")}
+        active={stepDaemonDone}
         disabled={!stepDaemonDone}
+        body={t("ollama.step3Detail", "gemma3:4b · nomic-embed-text")}
       />
-    </div>
+    </ol>
   );
 }
 
-function Step({
-  index,
-  label,
+/* ─── WizardStep ────────────────────────────────────────────────────── */
+function WizardStep({
+  n,
+  title,
+  body,
   done,
-  detail,
+  active = false,
   disabled = false,
   children,
 }: {
-  index: number;
-  label: string;
+  n: number;
+  title: string;
+  body?: string;
   done: boolean;
-  detail?: string;
+  active?: boolean;
   disabled?: boolean;
   children?: React.ReactNode;
 }) {
+  const bubbleBg = done
+    ? "var(--ok)"
+    : active
+    ? "var(--accent)"
+    : "var(--surface-2)";
+  const bubbleFg = done || active ? "white" : "var(--ink-3)";
+
   return (
-    <div
-      className={`border rounded-lg p-4 ${
-        done
-          ? "border-emerald-500/30 bg-emerald-500/5"
-          : disabled
-          ? "border-ink/10 bg-ink/5 opacity-60"
-          : "border-amber-500/25 bg-amber-500/5"
-      }`}
+    <li
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 14,
+        opacity: disabled ? 0.5 : 1,
+      }}
     >
-      <div className="flex items-center gap-3 mb-1">
-        <span
-          className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold ${
-            done
-              ? "bg-emerald-500 text-emerald-950"
-              : disabled
-              ? "bg-ink/20 text-ink/55"
-              : "bg-amber-500 text-amber-950"
-          }`}
-        >
-          {done ? "✓" : index}
-        </span>
-        <div className="font-medium">{label}</div>
-      </div>
-      {detail && (
-        <div className="text-xs text-ink/55 ml-9 mb-2 font-mono break-all">
-          {detail}
+      <span
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 999,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: bubbleBg,
+          color: bubbleFg,
+          fontSize: 12,
+          fontWeight: 600,
+          flexShrink: 0,
+          marginTop: 1,
+        }}
+      >
+        {done ? <span style={{ display: "inline-flex", width: 14, height: 14 }}>{Icons.check}</span> : n}
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 500, color: "var(--ink)" }}>{title}</div>
+          {done && <Pill tone="ok">complete</Pill>}
+          {active && !done && <Pill tone="accent" dot>in progress</Pill>}
         </div>
-      )}
-      {children && <div className="ml-9 mt-2">{children}</div>}
-    </div>
+        {body && (
+          <div className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)", marginBottom: children ? 8 : 0 }}>
+            {body}
+          </div>
+        )}
+        {children && <div style={{ marginTop: 4 }}>{children}</div>}
+      </div>
+    </li>
   );
 }
 
+/* ─── InstallPanel ──────────────────────────────────────────────────── */
 function InstallPanel({
   state,
   installing,
@@ -245,92 +272,158 @@ function InstallPanel({
   }
 
   return (
-    <div className="space-y-3">
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {state.methods.map((m) => (
-        <div key={m.id} className="border border-ink/10 rounded p-3 bg-canvas/30">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="text-sm font-medium flex-1">{m.label}</div>
+        <div
+          key={m.id}
+          style={{
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            padding: 12,
+            background: "var(--surface-2)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: m.command ? 8 : 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, flex: 1, color: "var(--ink)" }}>{m.label}</div>
             {m.auto_runnable ? (
               <button
+                className="btn primary sm"
                 onClick={() => onRun(m)}
                 disabled={installing}
-                className="bg-accent hover:bg-accent/90 disabled:opacity-50 px-3 py-1.5 rounded text-xs font-medium"
               >
-                {installing ? t("ollama.installing") : t("ollama.installNow")}
+                {installing
+                  ? t("ollama.installing", "Installing…")
+                  : t("ollama.installNow", "Install now")}
               </button>
             ) : m.url ? (
               <a
                 href={m.url}
                 target="_blank"
                 rel="noreferrer"
-                className="px-3 py-1.5 rounded border border-ink/20 hover:bg-ink/5 text-xs"
+                className="btn sm"
+                style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
               >
-                {t("ollama.openDownload")} ↗
+                {Icons.ext}
+                {t("ollama.openDownload", "Open download page")}
               </a>
             ) : null}
           </div>
           {m.command && (
-            <div className="flex items-center gap-2 mt-1">
-              <code className="flex-1 px-2 py-1 bg-ink/8 rounded text-[11px] break-all">
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <code
+                className="mono"
+                style={{
+                  flex: 1,
+                  padding: "4px 8px",
+                  background: "var(--surface-3)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 6,
+                  fontSize: 11,
+                  color: "var(--ink)",
+                  wordBreak: "break-all",
+                }}
+              >
                 {m.command}
               </code>
               <button
+                className="btn ghost sm"
                 onClick={() => copy(m.command!, m.id)}
-                className="text-[11px] px-2 py-1 rounded border border-ink/15 hover:bg-ink/5"
               >
-                {copied === m.id ? t("ollama.copied") : t("ollama.copy")}
+                {copied === m.id ? t("ollama.copied", "Copied") : t("ollama.copy", "Copy")}
               </button>
             </div>
           )}
-          {m.hint && <div className="text-[11px] text-ink/55 mt-1">{m.hint}</div>}
+          {m.hint && (
+            <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 6 }}>{m.hint}</div>
+          )}
         </div>
       ))}
+
       {state.methods.length === 0 && (
-        <div className="text-xs text-ink/55">
-          {t("ollama.noMethods")}{" "}
+        <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
+          {t("ollama.noMethods", "No automatic install method available.")}{" "}
           {state.download_url && (
             <a
               href={state.download_url}
               target="_blank"
               rel="noreferrer"
-              className="underline hover:text-ink"
+              style={{ color: "var(--accent)", textDecoration: "underline" }}
             >
-              {t("ollama.openDownload")}
+              {t("ollama.openDownload", "Open download page")}
             </a>
           )}
         </div>
       )}
 
       {(installing || log) && (
-        <div className="border border-ink/10 rounded">
-          <div className="flex items-center justify-between px-3 py-1.5 border-b border-ink/10 bg-ink/5">
-            <span className="text-[11px] uppercase text-ink/55">
-              {t("ollama.installLog")}
+        <div
+          style={{
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "6px 12px",
+              borderBottom: "1px solid var(--border)",
+              background: "var(--surface-2)",
+            }}
+          >
+            <span
+              className="k-label"
+              style={{ fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase" }}
+            >
+              {t("ollama.installLog", "Install log")}
             </span>
-            <div className="flex items-center gap-2">
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {installing && (
-                <button
-                  onClick={onCancel}
-                  className="text-[11px] px-2 py-0.5 rounded border border-ink/20 hover:bg-ink/5"
-                >
-                  {t("ollama.cancel")}
+                <button className="btn ghost sm" onClick={onCancel}>
+                  {t("ollama.cancel", "Cancel")}
                 </button>
               )}
               {exitCode != null && (
                 <span
-                  className={`text-[11px] ${
-                    exitCode === 0 ? "text-emerald-300" : "text-red-300"
-                  }`}
+                  style={{
+                    fontSize: 11,
+                    color: exitCode === 0 ? "var(--ok)" : "var(--danger)",
+                  }}
+                  className="mono"
                 >
                   exit {exitCode}
                 </span>
               )}
             </div>
           </div>
-          <pre className="p-3 text-[11px] font-mono whitespace-pre-wrap max-h-64 overflow-auto bg-canvas/30">
+          <pre
+            className="mono"
+            style={{
+              padding: 12,
+              fontSize: 11,
+              whiteSpace: "pre-wrap",
+              maxHeight: 256,
+              overflow: "auto",
+              background: "var(--surface)",
+              margin: 0,
+              color: "var(--ink-2)",
+            }}
+          >
             {log || (installing ? "…" : "")}
           </pre>
-          {error && <div className="px-3 pb-3 text-xs text-red-300">{error}</div>}
+          {error && (
+            <div
+              style={{
+                padding: "6px 12px 10px",
+                fontSize: 12,
+                color: "var(--danger)",
+              }}
+            >
+              {error}
+            </div>
+          )}
         </div>
       )}
     </div>

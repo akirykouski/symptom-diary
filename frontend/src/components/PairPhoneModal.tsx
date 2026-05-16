@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MobilePairToken, MobileSession, api } from "../api/client";
+import { Icons, Modal } from "../ui/clario";
 
 const TTL_OPTIONS = [5, 10, 20, 30];
 
@@ -28,70 +29,162 @@ export default function PairPhoneModal({ onClose }: { onClose: () => void }) {
   });
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
+    <Modal onClose={onClose} width={620}>
+      {/* Header */}
       <div
-        className="bg-canvas border border-ink/15 rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4"
-        onClick={(e) => e.stopPropagation()}
+        style={{
+          padding: "20px 24px 14px",
+          borderBottom: "1px solid var(--border)",
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 12,
+        }}
       >
-        <header className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{t("pair.modalTitle")}</h2>
-          <button onClick={onClose} className="text-ink/60 hover:text-ink" aria-label="close">
-            ✕
-          </button>
-        </header>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>
+            {t("pair.modalTitle", "Pair a phone for capture")}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 3 }}>
+            {t(
+              "pair.intro",
+              "Scan with a phone on the same WiFi. The phone lands on a focused capture page; photos upload straight into the journal, encrypted on arrival.",
+            )}
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="btn ghost sm"
+          style={{ padding: "0 8px", marginTop: -2 }}
+          aria-label="close"
+        >
+          {Icons.x}
+        </button>
+      </div>
 
-        <p className="text-xs text-ink/55">{t("pair.intro")}</p>
+      {/* Body */}
+      <div
+        style={{
+          padding: 24,
+          display: "grid",
+          gridTemplateColumns: mint.data ? "220px 1fr" : "1fr",
+          gap: 24,
+        }}
+      >
+        {mint.data ? (
+          <>
+            {/* QR column */}
+            <div
+              style={{
+                padding: 14,
+                borderRadius: 14,
+                background: "white",
+                border: "1px solid var(--border)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <img src={mint.data.qr_data_url} alt="pair-qr" style={{ width: 168, height: 168 }} />
+              <div className="mono" style={{ fontSize: 10.5, color: "var(--ink-3)" }}>
+                scoped: capture / write-only
+              </div>
+            </div>
 
-        {!mint.data ? (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block text-sm">
-                <span className="block text-ink/65 mb-1">{t("pair.ttlLabel")}</span>
-                <select
-                  value={ttl}
-                  onChange={(e) => setTtl(parseInt(e.target.value, 10))}
-                  className="w-full bg-bg/40 border border-ink/15 rounded px-2 py-1 text-sm"
+            {/* Token info column */}
+            <ActiveQr token={mint.data} onReset={() => mint.reset()} />
+          </>
+        ) : (
+          /* Form */
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <label style={{ display: "block" }}>
+                <span
+                  style={{
+                    display: "block",
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                    color: "var(--ink-2)",
+                    marginBottom: 6,
+                  }}
                 >
-                  {TTL_OPTIONS.map((n) => (
-                    <option key={n} value={n}>
-                      {t("pair.ttlMinutes", { count: n })}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block text-sm">
-                <span className="block text-ink/65 mb-1">{t("pair.label")}</span>
+                  {t("pair.label", "Label")}
+                </span>
                 <input
+                  className="input"
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
-                  className="w-full bg-bg/40 border border-ink/15 rounded px-2 py-1 text-sm"
+                  style={{ fontSize: 12.5 }}
                 />
               </label>
+
+              <label style={{ display: "block" }}>
+                <span
+                  style={{
+                    display: "block",
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                    color: "var(--ink-2)",
+                    marginBottom: 6,
+                  }}
+                >
+                  {t("pair.ttlLabel", "Link valid for")}
+                </span>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                  {TTL_OPTIONS.map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => setTtl(n)}
+                      style={{
+                        height: 30,
+                        padding: "0 12px",
+                        borderRadius: 999,
+                        cursor: "pointer",
+                        background: ttl === n ? "var(--accent-tint)" : "var(--surface)",
+                        color: ttl === n ? "var(--accent-strong)" : "var(--ink-2)",
+                        border:
+                          "1px solid " +
+                          (ttl === n
+                            ? "color-mix(in oklch, var(--accent) 30%, var(--border))"
+                            : "var(--border)"),
+                        fontSize: 12,
+                        fontWeight: ttl === n ? 600 : 500,
+                      }}
+                    >
+                      {t("pair.ttlMinutes", "{{count}} min", { count: n })}
+                    </button>
+                  ))}
+                </div>
+              </label>
             </div>
+
             <button
               onClick={() => mint.mutate()}
               disabled={mint.isPending}
-              className="w-full bg-accent hover:bg-accent/90 disabled:opacity-50 px-4 py-2 rounded-md text-sm font-medium"
+              className="btn primary"
+              style={{ alignSelf: "flex-start" }}
             >
-              {mint.isPending ? t("pair.minting") : t("pair.mintButton")}
+              <span style={{ display: "inline-flex" }}>{Icons.qr}</span>
+              {mint.isPending
+                ? t("pair.minting", "Generating…")
+                : t("pair.mintButton", "Generate pairing QR")}
             </button>
           </div>
-        ) : (
-          <ActiveQr token={mint.data} onReset={() => mint.reset()} />
         )}
-
-        <SessionsPanel
-          sessions={sessions.data?.sessions ?? []}
-          onRevoke={(id) => revoke.mutate(id)}
-          isRevoking={revoke.isPending}
-        />
-
-        <p className="text-[11px] text-ink/40">{t("pair.lockNote")}</p>
       </div>
-    </div>
+
+      {/* Sessions panel */}
+      <SessionsPanel
+        sessions={sessions.data?.sessions ?? []}
+        onRevoke={(id) => revoke.mutate(id)}
+        isRevoking={revoke.isPending}
+      />
+
+      {/* Footer */}
+      <div style={{ padding: "0 24px 20px", fontSize: 11, color: "var(--ink-4)" }}>
+        {t("pair.lockNote", "When the journal locks, all paired phones immediately lose write access.")}
+      </div>
+    </Modal>
   );
 }
 
@@ -106,33 +199,51 @@ function ActiveQr({ token, onReset }: { token: MobilePairToken; onReset: () => v
     0,
     Math.floor((new Date(token.expires_at).getTime() - now) / 1000),
   );
+
   return (
-    <div className="space-y-3">
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {!token.lan_ok && (
-        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200">
-          {t("pair.lanWarning")}
+        <div
+          style={{
+            padding: "8px 12px",
+            borderRadius: 8,
+            background: "var(--warn-tint)",
+            border: "1px solid color-mix(in oklch, var(--warn) 30%, var(--border))",
+            fontSize: 12,
+            color: "oklch(48% 0.12 75)",
+          }}
+        >
+          {t("pair.lanWarning", "Not on the same WiFi — the phone may not reach this machine.")}
         </div>
       )}
-      <div className="bg-white rounded-md p-3 flex items-center justify-center">
-        <img src={token.qr_data_url} alt="pair-qr" className="w-56 h-56" />
-      </div>
-      <div className="text-[11px] text-ink/65 space-y-1">
-        <div className="flex items-center justify-between">
-          <span>{t("pair.expiresIn", { seconds: secondsLeft })}</span>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12.5, color: "var(--ink-2)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>
+            {t("pair.expiresIn", "Expires in {{seconds}}s", { seconds: secondsLeft })}
+          </span>
           <button
             onClick={onReset}
-            className="text-ink/50 hover:text-ink underline-offset-2 hover:underline"
+            style={{
+              fontSize: 12,
+              color: "var(--ink-3)",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
           >
-            {t("pair.regenerate")}
+            {t("pair.regenerate", "Regenerate")}
           </button>
         </div>
         <div>
-          <span className="text-ink/45 mr-1">{t("pair.url")}:</span>
+          <span style={{ color: "var(--ink-3)", marginRight: 4 }}>{t("pair.url", "URL")}:</span>
           <a
             href={token.url}
             target="_blank"
             rel="noreferrer"
-            className="font-mono break-all text-accent hover:underline"
+            className="mono"
+            style={{ color: "var(--accent)", wordBreak: "break-all", fontSize: 11.5 }}
           >
             {token.url}
           </a>
@@ -152,30 +263,47 @@ function SessionsPanel({
   isRevoking: boolean;
 }) {
   const { t } = useTranslation();
-  if (sessions.length === 0) {
-    return (
-      <div className="text-[11px] text-ink/40 pt-2 border-t border-ink/10">
-        {t("pair.sessionsEmpty")}
-      </div>
-    );
-  }
   return (
-    <div className="pt-2 border-t border-ink/10 space-y-1">
-      <div className="text-[11px] uppercase tracking-wide text-ink/45 mb-1">
-        {t("pair.sessionsHeading")}
+    <div
+      style={{
+        margin: "0 24px 16px",
+        padding: 14,
+        borderRadius: 10,
+        background: "var(--surface-2)",
+        border: "1px solid var(--border)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: sessions.length > 0 ? 10 : 0 }}>
+        <b style={{ fontSize: 12.5, color: "var(--ink)" }}>
+          {t("pair.sessionsHeading", "Paired phones:")}
+        </b>
+        <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
+          {sessions.length === 0
+            ? t("pair.sessionsEmpty", "none yet")
+            : `${sessions.length} active`}
+        </span>
       </div>
       {sessions.map((s) => (
-        <div key={s.id} className="flex items-center justify-between text-[11px]">
-          <span className="text-ink/85">
-            {s.label}
-            <span className="text-ink/45 ml-2">{s.fetches} req</span>
-          </span>
+        <div
+          key={s.id}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "6px 0",
+            borderTop: "1px solid var(--border)",
+          }}
+        >
+          <span style={{ display: "inline-flex", color: "var(--ink-3)" }}>{Icons.mobile}</span>
+          <span style={{ flex: 1, fontSize: 12.5, color: "var(--ink)" }}>{s.label}</span>
+          <span style={{ fontSize: 11, color: "var(--ink-3)" }}>{s.fetches} req</span>
           <button
             disabled={isRevoking}
             onClick={() => onRevoke(s.id)}
-            className="text-rose-300 hover:text-rose-200 disabled:opacity-50"
+            className="btn ghost sm"
+            style={{ color: "var(--danger)", padding: "0 8px" }}
           >
-            {t("pair.revoke")}
+            {t("pair.revoke", "Revoke")}
           </button>
         </div>
       ))}

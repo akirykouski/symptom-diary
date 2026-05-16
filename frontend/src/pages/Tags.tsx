@@ -1,10 +1,20 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../api/client";
+import { ScreenHeader } from "../ui/clario";
+import { DEMO, pick } from "../ui/demo";
 
-const DEFAULT_COLOR = "#7c5cff";
+const SWATCHES = [
+  "oklch(60% 0.13 30)",
+  "oklch(64% 0.12 80)",
+  "oklch(58% 0.08 155)",
+  "oklch(58% 0.1 215)",
+  "oklch(58% 0.1 280)",
+  "oklch(60% 0.12 0)",
+];
+
+const DEFAULT_COLOR = SWATCHES[4]; // violet-ish
 
 export default function Tags() {
   const { t } = useTranslation();
@@ -25,7 +35,7 @@ export default function Tags() {
     },
     onError: (e: unknown) => {
       if (e instanceof ApiError && e.status === 409) {
-        setError(t("tags.errorTaken"));
+        setError(t("tags.errorTaken", { defaultValue: "That tag name is already taken." }));
       }
     },
   });
@@ -38,69 +48,130 @@ export default function Tags() {
     },
   });
 
+  const { rows, isDemo } = pick(tags.data, DEMO.tags);
+
   return (
-    <div className="h-full">
-      <header className="border-b border-ink/10 px-6 py-3 flex items-center gap-4">
-        <Link to="/" className="text-ink/60 hover:text-ink">←</Link>
-        <h1 className="text-lg font-semibold">{t("tags.manage")}</h1>
-      </header>
+    <>
+      <ScreenHeader
+        title={
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            {t("tags.manage", { defaultValue: "Tags" })}
+            {isDemo && (
+              <span className="pill" style={{ fontSize: 10.5, height: 20 }}>
+                sample data
+              </span>
+            )}
+          </span>
+        }
+        sub={t("tags.sub", { defaultValue: "Coloured chips you can attach to entries for filtering and graph nodes." })}
+      />
 
-      <div className="p-6 max-w-xl space-y-6">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (name.trim()) create.mutate();
-          }}
-          className="flex items-end gap-3"
-        >
-          <label className="flex-1">
-            <span className="block text-sm text-ink/70 mb-1">{t("tags.name")}</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 rounded-md bg-canvas border border-ink/20 focus:border-accent outline-none"
-            />
-          </label>
-          <label>
-            <span className="block text-sm text-ink/70 mb-1">{t("tags.color")}</span>
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="h-10 w-14 rounded bg-canvas border border-ink/20"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={!name.trim() || create.isPending}
-            className="bg-accent hover:bg-accent/90 disabled:opacity-50 px-4 py-2 rounded-md font-medium"
+      <div style={{ flex: 1, overflow: "auto", padding: "20px 28px 28px" }}>
+        {/* New tag card */}
+        <div className="card" style={{ padding: 18, marginBottom: 20 }}>
+          <div className="k-label" style={{ marginBottom: 8 }}>
+            {t("tags.new", { defaultValue: "New tag" })}
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (name.trim()) create.mutate();
+            }}
           >
-            {t("tags.create")}
-          </button>
-        </form>
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-
-        <ul className="divide-y divide-ink/10 border border-ink/10 rounded-md">
-          {(tags.data ?? []).length === 0 && (
-            <li className="px-4 py-3 text-ink/40">{t("tags.empty")}</li>
-          )}
-          {(tags.data ?? []).map((tag) => (
-            <li key={tag.id} className="px-4 py-3 flex items-center gap-3">
-              <span
-                className="inline-block w-3 h-3 rounded-full"
-                style={{ backgroundColor: tag.color ?? "#666" }}
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <input
+                className="input"
+                placeholder={t("tags.namePlaceholder", { defaultValue: "e.g. brain-fog" })}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                style={{ maxWidth: 260 }}
               />
-              <span className="flex-1">{tag.name}</span>
+              <div style={{ display: "flex", gap: 6 }}>
+                {SWATCHES.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setColor(c)}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 8,
+                      background: c,
+                      border: color === c
+                        ? "2px solid var(--ink)"
+                        : `1px solid color-mix(in oklch, ${c} 40%, transparent)`,
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
+                    title={c}
+                    aria-label={c}
+                  />
+                ))}
+              </div>
               <button
-                onClick={() => remove.mutate(tag.id)}
-                className="text-sm text-red-400 hover:text-red-300"
+                className="btn primary"
+                type="submit"
+                disabled={!name.trim() || create.isPending}
+                style={{ marginLeft: "auto" }}
               >
-                {t("tags.delete")}
+                {t("tags.create", { defaultValue: "Create tag" })}
               </button>
-            </li>
-          ))}
-        </ul>
+            </div>
+            {error && (
+              <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--danger)" }}>
+                {error}
+              </p>
+            )}
+          </form>
+        </div>
+
+        {/* Tag list card */}
+        <div className="card" style={{ overflow: "hidden" }}>
+          {rows.length === 0 ? (
+            <div style={{ padding: "16px 18px", color: "var(--ink-3)", fontSize: 13.5 }}>
+              {t("tags.empty", { defaultValue: "No tags yet. Create your first tag above." })}
+            </div>
+          ) : (
+            rows.map((tag, i) => (
+              <div
+                key={tag.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "32px 1fr 80px",
+                  gap: 14,
+                  alignItems: "center",
+                  padding: "12px 18px",
+                  borderBottom: i === rows.length - 1 ? "none" : "1px solid var(--border)",
+                }}
+              >
+                <span
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: 5,
+                    background: tag.color ?? "var(--ink-4)",
+                    justifySelf: "center",
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ fontSize: 13.5, fontWeight: 500 }}>
+                  #{tag.name}
+                </span>
+                <button
+                  className="btn ghost sm"
+                  style={{ color: "var(--danger)" }}
+                  disabled={isDemo || remove.isPending}
+                  onClick={() => {
+                    if (!isDemo) remove.mutate(tag.id);
+                  }}
+                >
+                  {t("tags.delete", { defaultValue: "Delete" })}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

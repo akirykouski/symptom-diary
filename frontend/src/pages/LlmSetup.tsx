@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, streamPull } from "../api/client";
 import type { PullChunk } from "../api/client";
 import OllamaWizard from "../components/OllamaWizard";
+import { Icons, Pill, ScreenHeader } from "../ui/clario";
 
 interface PullState {
   model: string;
@@ -60,113 +60,113 @@ export default function LlmSetup() {
     }
   }
 
+  const daemonPill = status.isLoading ? (
+    <Pill tone="neutral">{t("llm.checking", "Checking…")}</Pill>
+  ) : status.data?.ollama ? (
+    <Pill tone="ok" dot>
+      {t("llm.ollamaUp", "daemon reachable at")} {status.data.url}
+    </Pill>
+  ) : (
+    <Pill tone="warn" dot>
+      {t("llm.ollamaDown", "daemon unreachable at")} {status.data?.url ?? "localhost:11434"}
+    </Pill>
+  );
+
   return (
-    <div className="h-full">
-      <header className="border-b border-ink/10 px-6 py-3 flex items-center gap-4">
-        <Link to="/" className="text-ink/60 hover:text-ink">
-          ←
-        </Link>
-        <h1 className="text-lg font-semibold">{t("llm.title")}</h1>
-      </header>
-
-      <div className="p-6 max-w-2xl space-y-6">
-        <p className="text-ink/70">{t("llm.intro")}</p>
-
-        <OllamaWizard />
-
-        <ConnectionBanner data={status.data} loading={status.isLoading} />
-
-        {status.data && (
-          <div className="space-y-3">
-            {Object.entries(status.data.models).map(([modelName, installed]) => (
-              <ModelRow
-                key={modelName}
-                label={
-                  modelName === status.data!.installed?.[0]
-                    ? t("llm.extractor")
-                    : modelName.includes("embed")
-                    ? t("llm.embedder")
-                    : t("llm.modelLabel")
-                }
-                model={modelName}
-                installed={installed}
-                ollamaUp={status.data!.ollama}
-                pull={pull}
-                onPull={() => startPull(modelName)}
-                onCancel={() => abortRef.current?.abort()}
-              />
-            ))}
-          </div>
+    <>
+      <ScreenHeader
+        title={t("llm.title", "AI models · Ollama")}
+        sub={t(
+          "llm.intro",
+          "Everything runs locally on your machine — no model API calls leave the network.",
         )}
-
-        <div className="border border-ink/10 rounded-lg p-4">
-          <span className="block text-sm text-ink/70 mb-2">
-            {t("llm.customModel")}
-          </span>
-          <div className="flex gap-2">
-            <input
-              value={custom}
-              onChange={(e) => setCustom(e.target.value)}
-              placeholder="e.g. llama3.2:3b"
-              className="flex-1 px-3 py-2 rounded-md bg-canvas border border-ink/20 focus:border-accent outline-none"
-            />
-            <button
-              onClick={() => custom.trim() && startPull(custom.trim())}
-              disabled={!custom.trim() || !status.data?.ollama}
-              className="bg-accent hover:bg-accent/90 disabled:opacity-50 px-4 py-2 rounded-md font-medium"
-            >
-              {t("llm.customPull")}
-            </button>
+        actions={daemonPill}
+      />
+      <div style={{ flex: 1, overflow: "auto", padding: "24px 28px 28px" }}>
+        {/* Bootstrap wizard */}
+        <div className="card" style={{ padding: 22, marginBottom: 18 }}>
+          <div className="k-label" style={{ marginBottom: 12 }}>
+            {t("ollama.wizardTitle", "Bootstrap (3 steps)")}
           </div>
+          <OllamaWizard />
         </div>
 
-        {status.data?.installed && status.data.installed.length > 0 && (
-          <div className="text-sm text-ink/50">
-            <span className="font-medium">Installed:</span>{" "}
-            {status.data.installed.join(", ")}
+        {/* Model cards grid */}
+        {status.data && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 16,
+              marginBottom: 18,
+            }}
+          >
+            {Object.entries(status.data.models).map(([modelName, installed]) => {
+              const purpose = modelName === status.data!.installed?.[0]
+                ? t("llm.extractor", "Entity extractor & rationale writer")
+                : modelName.includes("embed")
+                ? t("llm.embedder", "Embeddings for canonical entity matching")
+                : t("llm.modelLabel", "AI model");
+              return (
+                <ModelCard
+                  key={modelName}
+                  name={modelName}
+                  purpose={purpose}
+                  installed={installed}
+                  ollamaUp={status.data!.ollama}
+                  pull={pull}
+                  onPull={() => startPull(modelName)}
+                  onCancel={() => abortRef.current?.abort()}
+                />
+              );
+            })}
           </div>
         )}
+
+        {/* Custom model pull */}
+        <div
+          className="card"
+          style={{
+            padding: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <span className="k-label">{t("llm.customModel", "Custom model")}</span>
+          <input
+            className="input"
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            placeholder="e.g. llama3.2:3b"
+            style={{ flex: 1, maxWidth: 360 }}
+          />
+          <button
+            className="btn primary"
+            onClick={() => custom.trim() && startPull(custom.trim())}
+            disabled={!custom.trim() || !status.data?.ollama}
+          >
+            {t("llm.customPull", "Pull custom model")}
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
-function ConnectionBanner({
-  data,
-  loading,
-}: {
-  data: { ollama: boolean; url: string } | undefined;
-  loading: boolean;
-}) {
-  const { t } = useTranslation();
-  if (loading || !data) {
-    return <div className="text-ink/60">{t("llm.checking")}</div>;
-  }
-  if (data.ollama) {
-    return (
-      <div className="px-4 py-3 rounded-md border border-emerald-500/30 bg-emerald-500/10 text-emerald-200 text-sm">
-        ● {t("llm.ollamaUp")} <code>{data.url}</code>
-      </div>
-    );
-  }
-  return (
-    <div className="px-4 py-3 rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-200 text-sm">
-      ● {t("llm.ollamaDown")} <code>{data.url}</code>
-    </div>
-  );
-}
-
-function ModelRow({
-  label,
-  model,
+/* ─── ModelCard ─────────────────────────────────────────────────────── */
+function ModelCard({
+  name,
+  purpose,
   installed,
   ollamaUp,
   pull,
   onPull,
   onCancel,
 }: {
-  label: string;
-  model: string;
+  name: string;
+  purpose: string;
   installed: boolean;
   ollamaUp: boolean;
   pull: PullState | null;
@@ -174,64 +174,121 @@ function ModelRow({
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
-  const active = pull && pull.model === model && !pull.done;
+  const isActive = pull != null && pull.model === name && !pull.done;
+  const isDone = pull != null && pull.model === name && pull.done;
   const pct =
-    pull && pull.model === model && pull.total
+    pull != null && pull.model === name && pull.total
       ? Math.min(100, Math.round(((pull.completed ?? 0) / pull.total) * 100))
       : null;
+
+  const cardStatus: "installed" | "pulling" | "missing" = isActive
+    ? "pulling"
+    : installed
+    ? "installed"
+    : "missing";
+
+  const progressPct = cardStatus === "installed" ? 100 : pct ?? 0;
+
   return (
-    <div className="border border-ink/10 rounded-lg p-4">
-      <div className="flex items-center gap-3">
-        <div className="flex-1">
-          <div className="text-sm text-ink/50">{label}</div>
-          <div className="font-mono text-sm">{model}</div>
+    <div className="card" style={{ padding: 16 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          marginBottom: 8,
+        }}
+      >
+        <div>
+          <div className="mono" style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)" }}>
+            {name}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>{purpose}</div>
         </div>
-        <div className="flex items-center gap-2">
-          {installed ? (
-            <span className="text-emerald-400 text-sm">✓ {t("llm.modelInstalled")}</span>
-          ) : (
-            <span className="text-amber-300 text-sm">{t("llm.modelMissing")}</span>
-          )}
-          {active ? (
+        {cardStatus === "installed" && <Pill tone="ok">{t("llm.modelInstalled", "installed")}</Pill>}
+        {cardStatus === "missing" && <Pill tone="neutral">{t("llm.modelMissing", "not installed")}</Pill>}
+        {cardStatus === "pulling" && (
+          <Pill tone="accent" dot>
+            {t("llm.pulling", "pulling")} {pct != null ? `${pct}%` : ""}
+          </Pill>
+        )}
+      </div>
+
+      {/* Progress bar */}
+      <div
+        style={{
+          marginTop: 10,
+          height: 4,
+          borderRadius: 999,
+          background: "var(--surface-2)",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            width: `${progressPct}%`,
+            height: "100%",
+            background: "var(--accent)",
+            transition: "width 200ms",
+          }}
+        />
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginTop: 10,
+        }}
+      >
+        <span className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>
+          {pull?.model === name && pull.status && !isDone
+            ? pull.status
+            : pull?.model === name && isDone && !pull.error
+            ? t("llm.pullDone", "complete")
+            : pull?.model === name && pull.error
+            ? pull.error
+            : ""}
+        </span>
+        <div style={{ display: "flex", gap: 6 }}>
+          {cardStatus === "missing" && (
             <button
-              onClick={onCancel}
-              className="px-3 py-1.5 rounded-md border border-ink/20 hover:bg-ink/5 text-sm"
-            >
-              {t("llm.pullCancel")}
-            </button>
-          ) : (
-            <button
+              className="btn sm primary"
               onClick={onPull}
-              disabled={!ollamaUp || installed}
-              className="bg-accent hover:bg-accent/90 disabled:opacity-50 px-3 py-1.5 rounded-md text-sm font-medium"
+              disabled={!ollamaUp}
+              style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
             >
-              {installed ? "✓" : t("llm.pullModel")}
+              {Icons.download}
+              {t("llm.pullModel", "Pull")}
+            </button>
+          )}
+          {cardStatus === "pulling" && (
+            <button className="btn sm" onClick={onCancel}>
+              {t("llm.pullCancel", "Cancel")}
+            </button>
+          )}
+          {cardStatus === "installed" && (
+            <button className="btn ghost sm" disabled style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              {Icons.check}
+              {t("llm.modelInstalled", "installed")}
             </button>
           )}
         </div>
       </div>
-      {pull && pull.model === model && (
-        <div className="mt-3 space-y-1">
-          <div className="text-xs text-ink/50">
-            {pull.status}
-            {pct != null && ` — ${pct}%`}
-          </div>
-          {pct != null && (
-            <div className="h-1.5 rounded-full bg-ink/10 overflow-hidden">
-              <div
-                className="h-full bg-accent transition-[width] duration-200"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          )}
-          {pull.error && (
-            <div className="text-sm text-red-400">
-              {t("llm.pullError")}: {pull.error}
-            </div>
-          )}
-          {pull.done && !pull.error && (
-            <div className="text-sm text-emerald-400">{t("llm.pullDone")}</div>
-          )}
+
+      {pull?.model === name && pull.error && (
+        <div
+          style={{
+            marginTop: 6,
+            fontSize: 11.5,
+            color: "var(--danger)",
+            background: "var(--danger-tint)",
+            borderRadius: 6,
+            padding: "4px 8px",
+          }}
+        >
+          {t("llm.pullError", "Error")}: {pull.error}
         </div>
       )}
     </div>

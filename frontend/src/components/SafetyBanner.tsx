@@ -1,25 +1,44 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Icons } from "../ui/clario";
 
 /**
- * Small, persistent (per-session-dismissable) banner restating the cross-cutting
- * clinical principles. Always re-appears on full reload.
+ * Persistent clinical-safety banner. Restating "patient-reported context,
+ * not a diagnosis" on every unlocked screen. Dismissible for the session;
+ * always re-appears on a full reload.
  */
-export default function SafetyBanner() {
+export default function SafetyBanner({ onHide }: { onHide?: () => void }) {
   const { t } = useTranslation();
-  const [dismissed, setDismissed] = useState(false);
-  if (dismissed) return null;
   return (
-    <div className="bg-amber-500/12 text-amber-200 border-b border-amber-500/30 text-xs px-4 py-1.5 flex items-center gap-3">
-      <span aria-hidden>⚕</span>
-      <span className="flex-1 truncate">{t("safety.banner")}</span>
-      <button
-        onClick={() => setDismissed(true)}
-        className="text-amber-200/70 hover:text-amber-200 px-1"
-        aria-label={t("safety.dismiss")}
-      >
-        ×
-      </button>
+    <div
+      style={{
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 16px",
+        background: "var(--warn-tint)",
+        borderBottom: "1px solid color-mix(in oklch, var(--warn) 25%, var(--border))",
+        color: "oklch(38% 0.07 75)",
+        fontSize: 12.5,
+      }}
+    >
+      <span style={{ color: "var(--warn)", display: "inline-flex", flexShrink: 0 }}>{Icons.shield}</span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <b style={{ color: "oklch(32% 0.08 75)", fontWeight: 600 }}>
+          Patient-reported context — not a diagnosis.
+        </b>
+        &nbsp;{t("safety.banner")}
+      </span>
+      {onHide && (
+        <button
+          onClick={onHide}
+          className="btn ghost sm"
+          style={{ height: 22, fontSize: 11.5, flexShrink: 0 }}
+          aria-label={t("safety.dismiss")}
+        >
+          Hide for this session
+        </button>
+      )}
     </div>
   );
 }
