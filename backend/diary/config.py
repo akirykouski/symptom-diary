@@ -56,10 +56,13 @@ SESSION_COOKIE = "diary_session"
 
 # Ollama integration.
 OLLAMA_URL = os.environ.get("DIARY_OLLAMA_URL", "http://127.0.0.1:11434")
-# The plan targets Gemma 4 26B A4B (`gemma4:26b-a4b-it-q4_K_M`). If that tag is not yet
-# published on Ollama, override DIARY_LLM_MODEL with whatever you can pull (e.g.
-# `gemma3:4b` for a small machine, `gemma3:27b-instruct-q4_K_M` for a larger one).
-LLM_MODEL = os.environ.get("DIARY_LLM_MODEL", "gemma4:26b-a4b-it-q4_K_M")
+# Default is the Clario fine-tuned extractor (Gemma 4 E4B + Clario v2 LoRA,
+# merged and quantized to Q4_K_M, ~5 GB). Registered into Ollama via the
+# Modelfile at huggingface.co/m0rtyddd/clario-gemma4-e4b-extract-gguf.
+# Fallbacks if you can't run it: `gemma3:4b` (small CPU), `gemma3:27b-instruct-q4_K_M`
+# (larger machine, vanilla Gemma — works but loses the colloquial->canonical
+# bridging that the LoRA was trained for).
+LLM_MODEL = os.environ.get("DIARY_LLM_MODEL", "clario-extract")
 EMBED_MODEL = os.environ.get("DIARY_EMBED_MODEL", "nomic-embed-text")
 EMBED_DIM = 768
 

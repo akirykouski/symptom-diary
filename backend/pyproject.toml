@@ -38,22 +38,6 @@ dev = [
 pdf = [
     "weasyprint>=62.0",
 ]
-# Runs the Clario LoRA extractor sidecar locally (scripts/clario_extractor_service.py).
-# Pulls transformers + peft + bitsandbytes + torch (~3 GB on disk, requires a
-# CUDA GPU with ~6 GB free VRAM). Without it, the backend's extraction worker
-# falls back to vanilla Gemma via Ollama. Adapter weights are pulled from
-# huggingface.co/m0rtyddd/clario-gemma4-e4b-lora-v2 on first run.
-extractor = [
-    "transformers>=4.45.0",
-    "peft>=0.13.0",
-    "bitsandbytes>=0.44.0",
-    "accelerate>=1.0.0",
-    "torch>=2.5.0",
-    "huggingface_hub>=0.26.0",
-    "pronto>=2.5.0",
-    "lxml>=5.0.0",
-    "tqdm>=4.66.0",
-]
 
 [build-system]
 requires = ["hatchling"]

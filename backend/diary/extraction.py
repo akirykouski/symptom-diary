@@ -33,10 +33,6 @@ from .db import IntegrityError, ProgrammingError, transaction
 from .llm import OllamaClient, OllamaError
 from .session import store
 
-# When set, extraction step is delegated to an external HTTP service that wraps
-# the fine-tuned Clario adapter + HPO lookup. Embeddings stay on Ollama.
-EXTRACTOR_URL = os.environ.get("CLARIO_EXTRACTOR_URL", "").rstrip("/")
-
 logger = logging.getLogger("diary.extraction")
 
 ENTITY_TYPES = {
@@ -322,23 +318,6 @@ def _upsert_edge(
 # ---------- worker entry point ------------------------------------------------
 
 
-async def _call_extractor_sidecar(diary: str, ts_recorded: str) -> dict:
-    """Delegate extraction to the Clario adapter sidecar. Returns the same
-    payload shape that `OllamaClient.generate_json` would (entities + ts_event_hint),
-    so the rest of the pipeline does not have to care which path was used."""
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        try:
-            r = await client.post(
-                f"{EXTRACTOR_URL}/extract",
-                json={"diary": diary, "ts_recorded": ts_recorded},
-            )
-        except (httpx.HTTPError, OSError) as e:
-            raise OllamaError(f"clario extractor unreachable: {e}") from e
-    if r.status_code != 200:
-        raise OllamaError(f"clario extractor {r.status_code}: {r.text}")
-    return r.json()
-
-
 async def process_one(
     conn: sqlite3.Connection,
     *,
@@ -353,15 +332,12 @@ async def process_one(
     if entry is None:
         return
 
-    if EXTRACTOR_URL:
-        payload = await _call_extractor_sidecar(entry["text_md"], entry["ts_recorded"])
-    else:
-        payload = await llm.generate_json(
-            _build_prompt(entry["text_md"], entry["ts_recorded"]),
-            model=LLM_MODEL,
-            format_schema=EXTRACTION_SCHEMA,
-            system=EXTRACTION_SYSTEM_PROMPT,
-        )
+    payload = await llm.generate_json(
+        _build_prompt(entry["text_md"], entry["ts_recorded"]),
+        model=LLM_MODEL,
+        format_schema=EXTRACTION_SCHEMA,
+        system=EXTRACTION_SYSTEM_PROMPT,
+    )
     extracted, ts_hint = _parse_response(payload)
 
     # Embed names in parallel.

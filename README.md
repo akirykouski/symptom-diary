@@ -93,38 +93,31 @@ We solved it with **post-training on Gemma 4 E4B via Unsloth**. We built a synth
 
 The product runs **both configurations** — patients choose stock Gemma or the Clario-Extract variant via the in-app setup wizard. The fine-tuned LoRA is published openly (CC-BY-4.0):
 
-- Model — <https://huggingface.co/m0rtyddd/clario-gemma4-e4b-lora-v2>
+- Model card — <https://huggingface.co/m0rtyddd/clario-gemma4-e4b-lora-v2>
 - Dataset — <https://huggingface.co/datasets/m0rtyddd/clario-synthetic-diary>
+- **GGUF (CPU-friendly)** — <https://huggingface.co/m0rtyddd/clario-gemma4-e4b-extract-gguf>
 
 <details>
-<summary><b>Running the fine-tuned sidecar</b> (optional — needs a CUDA GPU, ~6 GB VRAM)</summary>
+<summary><b>Run the fine-tuned extractor via Ollama</b> (works on Mac/Linux/Windows, CPU or GPU, no Python sidecar)</summary>
+
+The extractor ships as a regular Ollama model — the LoRA is merged into the base, the result is quantized to Q4_K_M GGUF (~5 GB), and the system prompt + few-shot demos are baked into the Modelfile.
 
 ```bash
-cd backend
-pip install -e ".[extractor]"
+# 1. download the GGUF + Modelfile
+huggingface-cli download m0rtyddd/clario-gemma4-e4b-extract-gguf \
+    --local-dir ./clario-extract --include "*.gguf" "Modelfile"
 
-# Optional: build the HPO synonym index so the sidecar resolves
-# canonical names -> HPO IDs (without it, hpo_id is just omitted).
-#   hp.obo:          http://purl.obolibrary.org/obo/hp.obo
-#   en_product4.xml: https://www.orphadata.com/data/xml/en_product4.xml
-python -m scripts.build_knowledge \
-    --hpo-obo path/to/hp.obo \
-    --orphanet-xml path/to/en_product4.xml \
-    --out data/disease_knowledge.json
-
-# Start the sidecar (pulls the ~70 MB adapter from HF Hub, ~60 s).
-CLARIO_KNOWLEDGE_PATH=data/disease_knowledge.json \
-    python -m scripts.clario_extractor_service
+# 2. register with Ollama
+cd clario-extract
+ollama create clario-extract -f Modelfile
 ```
 
-Then start the backend with `CLARIO_EXTRACTOR_URL=http://127.0.0.1:11435` — `backend/diary/extraction.py` delegates extraction to the sidecar; embeddings still go to Ollama.
+That's it — `clario-extract` is now Clario's default `DIARY_LLM_MODEL`. Start the backend (`./run.sh` / `start-windows.bat` / `Clario.command`) and the extraction worker picks it up. To fall back to vanilla Gemma for any reason: `export DIARY_LLM_MODEL=gemma3:4b`.
 
 | Env var | Default | Purpose |
 |---|---|---|
-| `CLARIO_ADAPTER` | `m0rtyddd/clario-gemma4-e4b-lora-v2` | HF repo ID or local path |
-| `CLARIO_EXTRACTOR_PORT` | `11435` | sidecar bind port |
-| `CLARIO_KNOWLEDGE_PATH` | *(unset)* | path to `disease_knowledge.json` |
-| `CLARIO_EXTRACTOR_URL` | *(unset)* | backend uses sidecar when set |
+| `DIARY_LLM_MODEL` | `clario-extract` | Ollama model tag used by extraction |
+| `DIARY_OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama HTTP endpoint |
 
 </details>
 
