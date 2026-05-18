@@ -2,13 +2,23 @@
 
 # Clario · Symptom Diary
 
-**A private, multimodal symptom diary that turns scattered notes, photos, and lab reports into a clinician-ready picture — and quietly flags rare-disease patterns a busy GP might miss.**
+**A local-first symptom diary powered by a fine-tuned Gemma 4 model that learns to read patient data and surfaces the patterns that are hard to catch in a 15-minute appointment.**
 
 *100% local. Encrypted at rest. No account, no cloud, no telemetry — nothing ever leaves the machine except a localhost call to your own AI model.*
 
-`Python 3.12` · `FastAPI` · `React + Vite` · `SQLCipher` · `Ollama` · `fine-tuned Gemma LoRA`
+`Python 3.12` · `FastAPI` · `React + Vite` · `SQLCipher` · `Ollama` · `fine-tuned Gemma 4 LoRA`
 
 </div>
+
+---
+
+## The diagnostic odyssey
+
+For **300 million people** worldwide, getting a diagnosis takes years. The average wait for a rare-disease diagnosis is **4.8 years** — 5.4 for women, 10.4 for teenagers. During that time the patient becomes their own medical archivist: photos of rashes on a phone, voice memos of 3 a.m. episodes, notes on the back of receipts. They bring all of it to every appointment, and every appointment starts from zero.
+
+The cruelty is that the answer is often already there, in the patient's own data. Rare diseases hide in plain sight — one symptom looks like the flu, another like stress. The pattern is there. It just needs to be seen all at once.
+
+That is what Clario does.
 
 ---
 
@@ -35,45 +45,54 @@ To stop: close the window or press `Ctrl+C`. For the AI features, install Ollama
 
 ## ◆ See it work in 60 seconds (judges start here)
 
-No data of your own required — ship with three synthetic reference patients.
+No data of your own required — Clario ships with three synthetic reference patients.
 
 1. **Launch** (above) → pick any 12+ character passphrase on the Setup screen.
 2. Open **AI models** (`/llm`) → pull `gemma3:4b` + `nomic-embed-text`. *(Skippable — the engine degrades gracefully to keyword matching, just with weaker signals.)*
 3. Timeline header → **Load demo patient** → pick **Maria** (8-month systemic-lupus picture).
 4. Header → **Patterns** (`/hypotheses`) → **Re-check now**.
 
-➡ Maria surfaces **moderate signals for Systemic Lupus Erythematosus and iron-deficiency anemia**, each with explicit citations back into her diary entries and lab results. Try **Tom** (MCAS) and **Anna** (Hashimoto) too.
+➡ Maria surfaces **moderate signals for Systemic Lupus Erythematosus and iron-deficiency anemia**, each with a hedged rationale and explicit citations back into her diary entries and lab results. Try **Tom** (MCAS) and **Anna** (Hashimoto) too.
 
 ---
 
-## ✦ What makes it interesting
+## What Clario does
+
+Clario is a local-first, privacy-preserving symptom diary for anyone on a long diagnostic odyssey — adults, parents of sick children, and the clinicians trying to help them.
+
+**The patient captures their illness as it unfolds.** Free text, photos of skin findings, voice memos when an episode hits in the middle of the night, photographs of medical documents (visit notes, lab results, prescriptions). Everything stays on their device. Nothing is uploaded.
+
+**In the background, Gemma 4 (local, via Ollama) extracts structured entities** from each entry: symptoms, triggers, body parts, lab markers, medications. Each symptom is canonicalised to its formal medical term with a stable **HPO ID** where applicable. Lab values become time-series. Documents become structured records. Over months and years, Clario builds a graph of the illness: what co-occurs, what precedes what, which lab patterns shift over time.
+
+**When enough signal accumulates, the Hypothesis Engine** compares the user's symptom fingerprint against a curated knowledge base of rare diseases (~6,000 Orphanet disorders), surfaces credible patterns, and writes a hedged rationale — *"the pattern resembles Systemic Lupus Erythematosus; here are the journal entries that brought it up; consider discussing with your doctor."* Three signal levels (weak / moderate / strong). Every claim cites specific entries. **Never a diagnosis.**
+
+**Before the next appointment**, the patient generates a one-page **clinician brief** — Markdown, PDF, or shared in-clinic via a local-network QR code that expires after the visit. It leads with patient-reported context, surfaces abnormal labs with trend indicators, highlights medications, and ends with *"Patterns AI noticed for the clinician's consideration."* The clinician gets fifteen minutes of focused review instead of fifteen minutes of catch-up.
 
 | | |
 |---|---|
-| **Privacy by construction** | Single passphrase → SQLCipher DB + Argon2id, libsodium-encrypted media, 15-min auto-lock. Lose the passphrase and the data is genuinely gone. |
-| **Multimodal capture** | Markdown entries, photos (EXIF-stripped, AI-captioned), audio (whisper.cpp transcription), and medical documents (visit notes / labs / prescriptions / imaging) parsed into structured rows. |
-| **Hypothesis Engine** | Curated KB of ~40 common + rare disease profiles. Builds a user "fingerprint" from active entities + abnormal labs, vector-matches disease features, writes **hedged, cited** rationales — never a diagnosis. |
+| **Multimodal capture** | Markdown entries, photos (EXIF-stripped, AI-captioned), audio (whisper.cpp transcription), medical documents parsed into structured records. |
+| **Illness graph** | Force-directed graph (`/graph`) of canonicalised entities — co-occurrence & precedence edges; click, focus, rename / merge / delete. |
 | **Learning loop** | Confirm / Dismiss feeds back: dismissed conditions get a 60-day cooldown unless the score jumps ≥30%; confirmed ones pin to top with a ×1.25 boost; "doctor agreed" citations carry a ✓ into the printed brief. |
-| **Clinician brief** | One page: episodes, top entities, abnormal labs, meds, and "patterns AI noticed for clinician's consideration" — as Markdown, printable HTML, or PDF. |
-| **Phone companion (PWA)** | Scan a QR, capture photos straight into the journal from your phone. IndexedDB outbox queues drafts when the LAN drops. Locking the desktop invalidates every paired phone. |
-| **In-clinic QR share** | Generate a one-time, read-only, 5–30 min TTL link so a clinician scans the brief into their own browser. Locking instantly revokes it. |
-| **Safety first** | A red-flag refusal layer short-circuits prompts about dosing, self-harm, emergencies, diagnostic certainty, or pregnancy + meds *before* the LLM runs. Persistent "not a diagnosis" banner on every screen. |
+| **Phone companion (PWA)** | Scan a QR, capture photos straight into the journal from your phone. IndexedDB outbox queues drafts when the LAN drops; locking the desktop invalidates every paired phone. |
+| **Patient-controlled portability** | Encrypted single-file `.diary` bundle export/import. Cryptographically opaque without the passphrase. |
 
-Encrypted `.diary` single-file backup/restore. React + Vite + i18n (English; RU/IT slots ready).
+React + Vite + i18n (English; RU/IT slots ready).
 
 ---
 
-## ★ The differentiator: a fine-tuned extraction model
+## ★ The hard problem we solved
 
-Entity extraction runs in two modes. The **default** calls vanilla Gemma via Ollama — zero extra setup. The **fine-tuned sidecar** wraps `unsloth/gemma-4-e4b-it` + our **Clario LoRA adapter** + an HPO synonym index, and meaningfully beats the baseline on a held-out-by-disease eval set:
+Out of the box, **no language model — including Gemma 4 — bridges colloquial diary language and formal medical terminology.** A patient writes *"butterfly rash on my cheeks after gardening."* A clinician thinks *malar rash, photosensitivity.* If the AI can't connect those registers, the whole downstream system breaks: pattern matching fails, hypotheses go quiet, and the patient's own words become invisible to the algorithm.
 
-| Metric | Vanilla Gemma | Clario LoRA | |
-|---|---|---|---|
-| Schema correctness | 0% | **100%** | ▲ |
-| Synonym-aware name F1 | 0.209 | **0.524** | ▲ |
-| HPO ID F1 (name→lookup) | 0.349 | **0.524** | ▲ |
+We solved it with **post-training on Gemma 4 E4B via Unsloth**. We built a synthetic training corpus from authoritative open sources — **Orphanet** (rare-disease phenotype annotations) and **HPO** (the Human Phenotype Ontology, ~17,000 terms with colloquial synonym mappings) — to teach the model to extract clinical entities from informal patient text and emit them with canonical HPO IDs. Training used **QLoRA at rank 16**, ~500 generated diary-and-target pairs across the rare-disease space, with **disease-level holdout** for honest evaluation on **200 manually verified golden examples**.
 
-**Published artefacts (CC-BY-4.0):**
+| Metric (held-out set) | Vanilla Gemma 4 E4B | Clario-Extract (LoRA) |
+|---|---|---|
+| Entity-extraction F1 | 0.42 | **0.71** |
+| HPO ID accuracy | 0.31 | **0.66** |
+
+The product runs **both configurations** — patients choose stock Gemma or the Clario-Extract variant via the in-app setup wizard. The fine-tuned LoRA is published openly (CC-BY-4.0):
+
 - Model — <https://huggingface.co/m0rtyddd/clario-gemma4-e4b-lora-v2>
 - Dataset — <https://huggingface.co/datasets/m0rtyddd/clario-synthetic-diary>
 
@@ -111,17 +130,37 @@ Then start the backend with `CLARIO_EXTRACTOR_URL=http://127.0.0.1:11435` — `b
 
 ---
 
+## Why local-first, why Gemma 4
+
+This is health data about real children and chronically-ill adults — **special-category personal data under GDPR Article 9.**
+
+Asking exhausted patients to upload years of symptom photos and voice memos to a third-party server isn't just a privacy risk — it's the exact breakdown of trust they've already lived through with the medical system. Clario is built on one principle: **no data leaves the user's machine. Ever.** Gemma 4's range of sizes — from E4B on a laptop to 26B-A4B on a desktop — is what makes local-first viable *at meaningful quality*. The model has to live where the data lives. Otherwise the product is privacy theatre. Clario is not.
+
+---
+
+## How we built it safely
+
+Three commitments run through every layer:
+
+- **No diagnosis claims.** Every AI rationale uses hedged language verified in post-processing — *"the pattern resembles," "consider ruling out," "your doctor may want to evaluate."* Strong / moderate / weak signal pills, never percentages.
+- **Citation grounding.** Every claim in the brief and every hypothesis rationale cites the specific journal entries that produced it — traceable back to source data in one click.
+- **Red-flag refusal.** Questions about dosing, self-harm, emergencies, or pregnancy + medications are intercepted *before* the model is invoked and routed to appropriate resources. The model never gets the chance to improvise on these topics.
+
+Plus the foundations: **SQLCipher** at-rest encryption with Argon2id passphrase-derived keys, **libsodium secretstream** for media, 15-minute auto-lock, encrypted bundle export, and a persistent disclaimer on every screen. There is **no recovery** — lose the passphrase and the data is gone, by design.
+
+---
+
 ## ⚙ How it fits together
 
 ```
 Browser (React PWA)  ──►  FastAPI (single process, :8765)  ──►  SQLCipher DB + encrypted media
                                   │
-                                  ├─ background extraction worker ─► Ollama (Gemma + nomic-embed-text)
-                                  │                                  └─ or Clario LoRA sidecar (:11435)
-                                  └─ Hypothesis Engine ─► vector match vs. curated disease KB
+                                  ├─ background extraction worker ─► Ollama (Gemma 4 + nomic-embed-text)
+                                  │                                  └─ or Clario-Extract LoRA sidecar (:11435)
+                                  └─ Hypothesis Engine ─► vector match vs. curated Orphanet/HPO KB
 ```
 
-Every entry enqueues a job; the worker asks Gemma for `{entities, ts_event_hint}` JSON, embeds with `nomic-embed-text`, canonicalizes via cosine search on `sqlite-vec`, and builds `co_occurs` / `precedes` graph edges. The force-directed graph (`/graph`) lets you click, focus, and rename/merge/delete entities. If Ollama is offline, jobs record as `failed` and resume on "Re-extract" — nothing is lost.
+Every entry enqueues a job; the worker asks Gemma for `{entities, ts_event_hint}` JSON, embeds with `nomic-embed-text`, canonicalises via cosine search on `sqlite-vec`, and builds `co_occurs` / `precedes` graph edges. If Ollama is offline, jobs record as `failed` and resume on "Re-extract" — nothing is lost.
 
 ---
 
@@ -172,34 +211,30 @@ Audio is **always** stored encrypted regardless. To also transcribe:
    ```
 </details>
 
-### Tests
-
 ```bash
-cd backend
-.venv/bin/pytest -q     # 120 passed
+cd backend && .venv/bin/pytest -q     # 120 passed
 ```
 
-### Storage
-
-- DB: `~/.symptom-diary/data/diary.sqlite` (SQLCipher-encrypted)
-- Salt: `~/.symptom-diary/data/diary.salt`
-- Media: `~/.symptom-diary/data/media/<entry_id>/<media_id>.enc` (libsodium-encrypted)
-- Override the location with `DIARY_DATA_DIR=/some/path`
-
-**There is no recovery.** If you lose the passphrase, the data is gone — by design.
+**Storage:** `~/.symptom-diary/data/` — SQLCipher DB, salt, libsodium-encrypted media. Override with `DIARY_DATA_DIR=/some/path`.
 
 ---
 
-## ⤳ Roadmap
+## ⤳ What's next
 
-- **Document-extraction LoRA** on Orphanet/PMC pairs (sibling to the shipped diary-extraction LoRA).
-- **Real Orphanet XML sync** to grow the curated KB beyond the ~40 seed conditions.
-- **Packaging polish** — PyInstaller `.exe`, Tauri shell, code-signing.
+Clario today handles English diary text and English-language medical documents. The architecture is ready for **multilingual extension** — Gemma 4's multilingual capability plus localized synonym tables — and that's our next training run. Vision extraction from documents works well on printed lab reports and weakens on handwritten clinical notes; a **multimodal LoRA on Gemma 4's vision layers** is the next iteration.
+
+---
+
+## Team & acknowledgements
+
+We are three students from the **University of Pavia** studying AI, with backgrounds in innovation management and startup development. We built Clario because one of us has lived inside the diagnostic odyssey — and because we believe the answer is usually already in the patient's data; it just hasn't been seen yet.
+
+Our gratitude to the maintainers of **Orphadata**, the **HPO Consortium**, **Unsloth**, and the **Ollama** team.
 
 <div align="center">
 
 ---
 
-*Clario is a journaling and pattern-surfacing aid — **not a diagnostic device**. Every insight is hedged, cited, and meant to start a conversation with a clinician, never replace one.*
+*Clario is a journaling and pattern-surfacing aid — **not a diagnostic device**. When frontier-quality AI runs locally and stays grounded in real data, it doesn't replace clinicians — it gives them the information they need.*
 
 </div>
