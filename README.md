@@ -250,11 +250,68 @@ Easiest way to see the Hypothesis Engine working without any data of your own:
 Maria should produce moderate signals for Systemic Lupus Erythematosus and
 Iron-deficiency anemia, with citations back into her diary and lab results.
 
+## Fine-tuned extractor (optional)
+
+The entity-extraction stage ships in two modes:
+
+1. **Default** — backend calls vanilla Gemma via Ollama with a prompt that
+   asks for the `{entities, ts_event_hint}` JSON schema. Works out of the
+   box, fewer dependencies.
+2. **Fine-tuned sidecar** — a local FastAPI service on `:11435` wrapping
+   `unsloth/gemma-4-e4b-it` + the Clario LoRA adapter
+   (`m0rtyddd/clario-gemma4-e4b-lora-v2` on HuggingFace) + an HPO synonym
+   index. Schema correctness 0 → 100 %, synonym-aware name F1 0.209 →
+   0.524, HPO ID F1 via name→lookup 0.349 → 0.524, all measured against a
+   held-out-by-disease eval set. Full numbers and limitations live in
+   the model card.
+
+### Running the sidecar
+
+Requires a CUDA GPU with ~6 GB free VRAM. The adapter (~70 MB) is pulled
+from HuggingFace Hub on first run.
+
+```bash
+cd backend
+pip install -e .[extractor]
+
+# Optional: build the HPO synonym index so the sidecar can resolve
+# canonical names -> HPO IDs. Without it the sidecar still works but
+# omits hpo_id from extracted entities.
+#   - hp.obo:           http://purl.obolibrary.org/obo/hp.obo
+#   - en_product4.xml:  https://www.orphadata.com/data/xml/en_product4.xml
+python -m scripts.build_knowledge \
+    --hpo-obo path/to/hp.obo \
+    --orphanet-xml path/to/en_product4.xml \
+    --out data/disease_knowledge.json
+
+# Start the sidecar (loads adapter from HF Hub, ~60 s).
+CLARIO_KNOWLEDGE_PATH=data/disease_knowledge.json \
+    python -m scripts.clario_extractor_service
+```
+
+Then start the backend with `CLARIO_EXTRACTOR_URL=http://127.0.0.1:11435`
+pointing at the sidecar — `backend/diary/extraction.py` will delegate
+extraction to it. Embeddings still go to Ollama.
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `CLARIO_ADAPTER` | `m0rtyddd/clario-gemma4-e4b-lora-v2` | HF repo ID or local path |
+| `CLARIO_EXTRACTOR_PORT` | `11435` | sidecar bind port |
+| `CLARIO_KNOWLEDGE_PATH` | *(unset)* | path to `disease_knowledge.json` |
+| `CLARIO_EXTRACTOR_URL` | *(unset)* | backend uses sidecar when set |
+
+### Published artefacts
+
+- Model: <https://huggingface.co/m0rtyddd/clario-gemma4-e4b-lora-v2>
+- Dataset: <https://huggingface.co/datasets/m0rtyddd/clario-synthetic-diary>
+
+Both are CC-BY-4.0 (propagated from HPO + Orphanet attribution).
+
 ## Roadmap
 
 See `../symptom-diary-plan (1).md`. Remaining work:
-- **Unsloth fine-tune** (parallel sponsor track) — entity extraction LoRA +
-  document extraction LoRA on Orphanet/PMC pairs.
+- **Document extraction LoRA** on Orphanet/PMC pairs (sibling to the
+  diary-extraction LoRA shipped above).
 - **Real Orphanet XML sync** to grow the curated KB beyond the ~40 seed
   conditions.
 - **Polish** — PyInstaller .exe, Tauri shell, code-signing.
