@@ -40,6 +40,8 @@ export default function Timeline() {
   });
   const allEntriesQ = useQuery({ queryKey: ["entries", { tag: undefined }], queryFn: () => api.listEntries() });
   const tagsQ = useQuery({ queryKey: ["tags"], queryFn: api.listTags });
+  const activePersonaQ = useQuery({ queryKey: ["demo", "active"], queryFn: api.activePersona });
+  const personasQ = useQuery({ queryKey: ["demo", "personas"], queryFn: api.listPersonas });
 
   const createM = useMutation({
     mutationFn: (draft: EntryDraft) => api.createEntry(draft),
@@ -66,6 +68,14 @@ export default function Timeline() {
   const realEntries = entriesQ.data ?? [];
   const hasReal = (allEntriesQ.data ?? []).length > 0;
   const isDemo = !hasReal;
+
+  // Greeting name follows the loaded demo persona ("Maria · 26y · …" → "Maria"),
+  // falling back to the bundled sample only when no persona is active.
+  const activeId = activePersonaQ.data?.persona_id ?? null;
+  const personaTitle = personasQ.data?.find((p) => p.id === activeId)?.title;
+  const patientName =
+    personaTitle?.split("·")[0].trim().split(" ")[0] ||
+    DEMO.user.name.split(" ")[0];
 
   // Tag palette: real tags, falling back to the design's demo tags so the
   // filter row and chips read well on an empty journal.
@@ -131,7 +141,7 @@ export default function Timeline() {
   return (
     <>
       <ScreenHeader
-        title={greeting(DEMO.user.name.split(" ")[0])}
+        title={greeting(patientName)}
         sub="One line a day is enough — the engine takes care of the rest."
         actions={
           <>
