@@ -1,321 +1,104 @@
-# Symptom Diary
+<div align="center">
 
-A local, multimodal symptom diary with graph visualization and a background hypothesis engine for rare diseases. Everything runs locally — no outbound network except localhost Ollama.
+# Clario · Symptom Diary
 
-## Status
+**A private, multimodal symptom diary that turns scattered notes, photos, and lab reports into a clinician-ready picture — and quietly flags rare-disease patterns a busy GP might miss.**
 
-**MVP-5** — everything from MVP-4 plus a **PWA mobile capture companion**
-(scan a QR with a phone, take photos straight into the journal, IndexedDB
-outbox queues drafts when the LAN drops) and a **Hypothesis Engine learning
-loop** (dismissals suppress for 60 days unless the score grows ≥ 30%;
-confirmed diseases pin to the top and get a ×1.25 boost; per-entry "doctor
-agreed" corroboration shows up in the brief).
+*100% local. Encrypted at rest. No account, no cloud, no telemetry — nothing ever leaves the machine except a localhost call to your own AI model.*
 
-The full roadmap lives in `../symptom-diary-plan (1).md`.
+`Python 3.12` · `FastAPI` · `React + Vite` · `SQLCipher` · `Ollama` · `fine-tuned Gemma LoRA`
 
-## What works today
+</div>
 
-- Single-user, single-passphrase encrypted journal (SQLCipher / Argon2id)
-- 15-minute auto-lock on inactivity
-- Markdown entries, mood (-2…+2), severity (0–10), tags + filterable timeline
-- **Ollama integration through the in-app `/llm` page** — see status, pull models with streaming progress, target the model the extractor uses
-- **Background extraction worker** — every entry enqueues a job; the worker
-  asks Gemma for `{entities, ts_event_hint}` JSON, embeds with `nomic-embed-text`,
-  canonicalizes via cosine search on `sqlite-vec`, builds `co_occurs` and
-  `precedes` edges
-- **Force-directed graph** (`/graph`) — entities colored by type, click for
-  details + recent mentions + neighbors; right-click to focus; rename / merge / delete
-- Queue indicator on the timeline; "Re-extract" button on every entry
-- **Encrypted media attachments** (libsodium secretstream + HKDF subkey from passphrase)
-  - **Photos** — EXIF-stripped, resized, decrypted on-stream; vision Gemma writes a
-    short caption back into the entry
-  - **Audio** — uploaded encrypted; whisper.cpp (if installed) transcribes and
-    appends `> [audio transcript]` to the entry
-  - **Medical documents** (visit note / lab result / prescription / imaging /
-    discharge / referral) — vision Gemma extracts strict JSON which is broken
-    out into `document_record`, `lab_value`, `medication_record` rows. UI shows
-    an editable confirmation form before marking the document `verified`.
-- **Documents page** (`/documents`) — filter by type, drill into AI-extracted fields,
-  edit & verify
-- **Lab timeline** (`/labs`) — series view per test (e.g. TSH over years), with
-  high/low/in-range flags
-- **Medications page** (`/medications`) — every prescription extracted from any
-  document, sorted by date
-- **Hypothesis Engine** (`/hypotheses`) — curated KB of ~40 common + rare disease
-  profiles (`backend/diary/data/diseases_seed.json`). Engine builds a "user
-  fingerprint" from active entities + abnormal labs, vector-matches against
-  disease features, aggregates by frequency-class weight, and writes hedged
-  rationales. Three-tier signal pills (weak / moderate / strong), explicit
-  citations to journal entries / labs / meds, dismiss / confirm / reactivate,
-  graceful fallback when Ollama is unavailable (templated rationale + Jaccard
-  matching).
-- **Clinician brief** (`/insights`) — markdown + printable HTML + downloadable
-  PDF (via optional WeasyPrint extra; gracefully falls back to a downloadable
-  HTML attachment when WeasyPrint isn't installed). Episodes, top entities,
-  abnormal labs, medications, and "Patterns AI noticed for clinician's
-  consideration" block.
-- **Ask-anything Q&A** (`/insights` → ask box) — every answer cites the
-  underlying journal entries as inline `[entry-<prefix>]` pills; a red-flag
-  refusal layer short-circuits prompts about dosing, self-harm, emergencies,
-  diagnostic certainty, or pregnancy + medication safety *before* the LLM is
-  called. Hedged-language and citation enforcement on the model output, with
-  a deterministic grounded-summary fallback when Ollama is unavailable or the
-  output fails the safety filter.
-- **Encrypted `.diary` bundle export/import** — single-file backup containing
-  the SQLCipher database, salt, manifest, and encrypted media tree. Bundle is
-  cryptographically opaque without the passphrase. Restore-from-bundle option
-  on the Setup screen.
-- **In-clinic QR share** — generate a one-time URL + QR code (5–30 min TTL,
-  read-only, scoped to the brief) so a clinician can scan it from a phone on
-  the same WiFi and view the brief in their own browser. Locking the journal
-  immediately invalidates active share links.
-- **Mobile capture companion (PWA)** — pair a phone via QR; the phone lands
-  on a focused capture page (camera shutter + optional note) that uploads
-  photos directly into the journal. IndexedDB outbox queues drafts when the
-  LAN drops and auto-flushes when reachable. Mobile sessions live as long as
-  the desktop is unlocked; locking the journal invalidates every paired phone.
-- **Hypothesis Engine learning loop** — Confirm/Dismiss actions on patterns
-  feed back into matching: dismissed diseases get a 60-day cooldown unless
-  the new aggregate score exceeds the dismissal score by 30%; confirmed
-  diseases pin to the top of the list with a ★ badge and a ×1.25 score
-  boost; users can mark individual citations as "doctor agreed", which
-  carries a ✓ marker into the printed brief.
-- **Synthetic reference patients** (`POST /api/demo/load`) — Maria (8mo SLE
-  picture), Tom (6mo MCAS picture), Anna (5mo Hashimoto picture). Pre-loaded
-  diary text, lab results, prescriptions. One-click loadable from the timeline.
-- **Persistent safety banner** restating "not a diagnosis, discuss with a
-  clinician" on every screen.
-- React + Vite + i18n (English; RU/IT slots ready)
+---
 
-## Prerequisites
+## ▶ Run it in one step
 
-### Windows (primary target)
+The whole app — backend, AI glue, and UI — runs as **one local process on one URL**.
 
-- Python 3.12 ([python.org](https://www.python.org/downloads/))
-- Node 20+ ([nodejs.org](https://nodejs.org/))
-- `pip install uv`
-- `npm i -g pnpm` (optional — `npm` works too)
+| Platform | Launch |
+|---|---|
+| **Windows** | Double-click **`start-windows.bat`** *(or right-click `run.ps1` → Run with PowerShell)* |
+| **macOS** | Double-click **`Clario.command`** *(or `./run.sh`)* |
+| **Linux** | `./run.sh` |
 
-The Windows wheel for `sqlcipher3-binary` is bundled — no native build step.
+First run sets everything up (Python env + backend + UI build, ~2 min — needs **Python 3.12+** and **Node 20+**). Every run after that launches instantly and opens your browser at **<http://127.0.0.1:8765>**.
 
-### macOS / Linux (dev)
-
-The `sqlcipher3` source package builds against system SQLCipher.
-
-```bash
-brew install sqlcipher                # macOS
-# sudo apt install libsqlcipher-dev   # Debian/Ubuntu
-
-export SQLCIPHER_PATH=$(brew --prefix sqlcipher)
-export CFLAGS="-I${SQLCIPHER_PATH}/include -I${SQLCIPHER_PATH}/include/sqlcipher"
-export LDFLAGS="-L${SQLCIPHER_PATH}/lib"
+```
+./run.sh --rebuild      # macOS/Linux: force a fresh deps install + UI rebuild
+.\run.ps1 -Rebuild      # Windows: same
 ```
 
-## Quick start (one command)
+To stop: close the window or press `Ctrl+C`. For the AI features, install Ollama from the in-app **AI models** page (one click).
 
-For everyday use you don't need two terminals or a dev server — one launcher
-sets everything up and serves the whole app on a single local URL.
+---
 
-**Windows** — double-click **`start-windows.bat`** (or right-click
-`run.ps1` → *Run with PowerShell*).
+## ◆ See it work in 60 seconds (judges start here)
 
-**macOS** — double-click **`Clario.command`** (or run `./run.sh`).
+No data of your own required — ship with three synthetic reference patients.
 
-**Linux** — `./run.sh`
+1. **Launch** (above) → pick any 12+ character passphrase on the Setup screen.
+2. Open **AI models** (`/llm`) → pull `gemma3:4b` + `nomic-embed-text`. *(Skippable — the engine degrades gracefully to keyword matching, just with weaker signals.)*
+3. Timeline header → **Load demo patient** → pick **Maria** (8-month systemic-lupus picture).
+4. Header → **Patterns** (`/hypotheses`) → **Re-check now**.
 
-The first run creates the Python environment, installs the backend, and
-builds the interface (~2 min, needs Python 3.12+ and Node 20+). Every run
-after that launches instantly and opens your browser at
-<http://127.0.0.1:8765>. Pass `-Rebuild` (Windows) / `--rebuild`
-(macOS/Linux) to force a fresh install + UI rebuild after updating.
+➡ Maria surfaces **moderate signals for Systemic Lupus Erythematosus and iron-deficiency anemia**, each with explicit citations back into her diary entries and lab results. Try **Tom** (MCAS) and **Anna** (Hashimoto) too.
 
-Nothing leaves your machine. To stop, close the window or press `Ctrl+C`.
-For AI features, install Ollama from the in-app **AI models** page.
+---
 
-## Run (dev)
+## ✦ What makes it interesting
 
-The dev setup (hot-reload frontend on :5173, backend on :8765) is still the
-two-process flow below — use it when changing code, not for everyday use.
+| | |
+|---|---|
+| **Privacy by construction** | Single passphrase → SQLCipher DB + Argon2id, libsodium-encrypted media, 15-min auto-lock. Lose the passphrase and the data is genuinely gone. |
+| **Multimodal capture** | Markdown entries, photos (EXIF-stripped, AI-captioned), audio (whisper.cpp transcription), and medical documents (visit notes / labs / prescriptions / imaging) parsed into structured rows. |
+| **Hypothesis Engine** | Curated KB of ~40 common + rare disease profiles. Builds a user "fingerprint" from active entities + abnormal labs, vector-matches disease features, writes **hedged, cited** rationales — never a diagnosis. |
+| **Learning loop** | Confirm / Dismiss feeds back: dismissed conditions get a 60-day cooldown unless the score jumps ≥30%; confirmed ones pin to top with a ×1.25 boost; "doctor agreed" citations carry a ✓ into the printed brief. |
+| **Clinician brief** | One page: episodes, top entities, abnormal labs, meds, and "patterns AI noticed for clinician's consideration" — as Markdown, printable HTML, or PDF. |
+| **Phone companion (PWA)** | Scan a QR, capture photos straight into the journal from your phone. IndexedDB outbox queues drafts when the LAN drops. Locking the desktop invalidates every paired phone. |
+| **In-clinic QR share** | Generate a one-time, read-only, 5–30 min TTL link so a clinician scans the brief into their own browser. Locking instantly revokes it. |
+| **Safety first** | A red-flag refusal layer short-circuits prompts about dosing, self-harm, emergencies, diagnostic certainty, or pregnancy + meds *before* the LLM runs. Persistent "not a diagnosis" banner on every screen. |
 
-### Backend → http://localhost:8765
+Encrypted `.diary` single-file backup/restore. React + Vite + i18n (English; RU/IT slots ready).
+
+---
+
+## ★ The differentiator: a fine-tuned extraction model
+
+Entity extraction runs in two modes. The **default** calls vanilla Gemma via Ollama — zero extra setup. The **fine-tuned sidecar** wraps `unsloth/gemma-4-e4b-it` + our **Clario LoRA adapter** + an HPO synonym index, and meaningfully beats the baseline on a held-out-by-disease eval set:
+
+| Metric | Vanilla Gemma | Clario LoRA | |
+|---|---|---|---|
+| Schema correctness | 0% | **100%** | ▲ |
+| Synonym-aware name F1 | 0.209 | **0.524** | ▲ |
+| HPO ID F1 (name→lookup) | 0.349 | **0.524** | ▲ |
+
+**Published artefacts (CC-BY-4.0):**
+- Model — <https://huggingface.co/m0rtyddd/clario-gemma4-e4b-lora-v2>
+- Dataset — <https://huggingface.co/datasets/m0rtyddd/clario-synthetic-diary>
+
+<details>
+<summary><b>Running the fine-tuned sidecar</b> (optional — needs a CUDA GPU, ~6 GB VRAM)</summary>
 
 ```bash
 cd backend
-uv venv --python 3.12
-uv pip install -e ".[dev]"
-uv run python -m diary
-```
+pip install -e ".[extractor]"
 
-### Frontend → http://localhost:5173
-
-```bash
-cd frontend
-npm install            # or pnpm install
-npm run dev
-```
-
-Open http://localhost:5173 — pick a passphrase and start journaling. Vite proxies `/api/*` to the backend.
-
-### Ollama (for AI features)
-
-The app ships a 3-step bootstrap wizard at `/llm`:
-
-1. **Install Ollama**
-   - macOS + Homebrew → one-click `brew install ollama` (streamed live).
-   - macOS without Homebrew → "Open download page" link.
-   - Linux → official one-liner shown with copy-to-clipboard (it needs sudo, so we don't auto-run it).
-   - Windows → "Open download page" link.
-2. **Start Ollama** → spawns `ollama serve` as a managed child process; killed automatically when the backend shuts down.
-3. **Pull AI models** → existing pull-with-progress UI (`gemma3:4b` + `nomic-embed-text` are good defaults).
-
-If you'd rather start it yourself: `ollama serve` (the wizard auto-detects an externally-started daemon and skips its own spawn). Override the default model with:
-
-```bash
-DIARY_LLM_MODEL=gemma3:4b ./run-backend.sh   # or any Ollama tag you have
-```
-
-If Ollama is offline the extraction worker still records jobs as `failed`; once you start Ollama and click "Re-extract" on an entry, processing resumes. The same applies to media — if you upload a photo while Ollama is down, the photo is encrypted and stored, and you can click "Re-run AI" once Ollama is up.
-
-### whisper.cpp (audio transcription)
-
-Audio is **always** stored encrypted regardless of whether whisper is available — uploading still works, you just won't get an automatic transcript. To enable transcription:
-
-1. Build or download `whisper-cli` from <https://github.com/ggerganov/whisper.cpp>
-2. Download a ggml model (e.g. `ggml-small.bin`)
-3. Export both paths before launching the backend:
-
-   ```bash
-   export DIARY_WHISPER_BIN=/path/to/whisper-cli
-   export DIARY_WHISPER_MODEL=/path/to/ggml-small.bin
-   ```
-
-## Storage
-
-- DB: `~/.symptom-diary/data/diary.sqlite` (SQLCipher-encrypted)
-- Salt: `~/.symptom-diary/data/diary.salt`
-- Media: `~/.symptom-diary/data/media/<entry_id>/<media_id>.enc` (libsodium-encrypted)
-- Override with `DIARY_DATA_DIR=/some/path`
-
-There is **no recovery**. If you lose the passphrase, the data is gone.
-
-## Tests
-
-```bash
-cd backend
-.venv/bin/pytest -q
-# 118 passed
-```
-
-## Smoke checklist (manual UI test)
-
-1. Fresh setup
-   - Wipe `~/.symptom-diary/data/`
-   - `npm run dev` + backend running
-   - Open localhost:5173 → Setup screen appears
-   - Enter passphrase ≥12 chars, confirm, submit → redirected to empty Timeline
-2. Tags
-   - Click "Tags" → create one (e.g. `head`, color red)
-   - Back to timeline → the tag appears as a filter chip
-3. Entry
-   - Click "New entry" → editor modal opens
-   - Pick a date/time, write markdown text, set mood/severity, tag it
-   - Save → bar appears on the timeline
-4. Edit + delete
-   - Click the timeline item → editor reopens with values preloaded
-   - Edit text, save → updated tooltip
-   - Open again → Delete → bar disappears
-5. Lock + unlock
-   - Click "Lock" → returns to Unlock screen
-   - Wrong passphrase → red "Wrong passphrase"
-   - Correct passphrase → entries reappear unchanged
-6. Encryption at rest
-   - With backend stopped, run `file ~/.symptom-diary/data/diary.sqlite`
-   - Output: `data` (not `SQLite 3.x database`)
-   - `sqlite3 ~/.symptom-diary/data/diary.sqlite .tables` → `Error: file is not a database`
-
-## Project layout
-
-```
-symptom-diary/
-├── backend/
-│   ├── diary/
-│   │   ├── app.py          # FastAPI factory + CORS
-│   │   ├── config.py       # paths, env, constants
-│   │   ├── crypto.py       # Argon2id + HKDF
-│   │   ├── db.py           # SQLCipher connection + migrations
-│   │   ├── deps.py         # require_unlocked dependency
-│   │   ├── models.py       # Pydantic schemas
-│   │   ├── session.py      # in-memory unlock state, auto-lock
-│   │   ├── migrations/001_init.sql
-│   │   └── routes/
-│   │       ├── auth.py
-│   │       ├── entries.py
-│   │       └── tags.py
-│   └── tests/
-└── frontend/
-    └── src/
-        ├── api/client.ts
-        ├── i18n/{index.ts, locales/en.json}
-        ├── components/{EntryEditor, TimelineView, TagPicker}.tsx
-        └── pages/{Setup, Unlock, Timeline, Tags}.tsx
-```
-
-## Demo
-
-Easiest way to see the Hypothesis Engine working without any data of your own:
-
-1. Set up the journal (Setup screen) — any 12+ char passphrase.
-2. Open `/llm` and pull `gemma3:4b` (or another vision-capable Gemma) +
-   `nomic-embed-text`. Skipping this still works, but the engine falls back
-   to keyword Jaccard and produces fewer / weaker matches.
-3. Click **Load demo patient** in the Timeline header → pick Maria.
-4. Hit **Patterns** in the header (or `/hypotheses`) → click **Re-check now**.
-
-Maria should produce moderate signals for Systemic Lupus Erythematosus and
-Iron-deficiency anemia, with citations back into her diary and lab results.
-
-## Fine-tuned extractor (optional)
-
-The entity-extraction stage ships in two modes:
-
-1. **Default** — backend calls vanilla Gemma via Ollama with a prompt that
-   asks for the `{entities, ts_event_hint}` JSON schema. Works out of the
-   box, fewer dependencies.
-2. **Fine-tuned sidecar** — a local FastAPI service on `:11435` wrapping
-   `unsloth/gemma-4-e4b-it` + the Clario LoRA adapter
-   (`m0rtyddd/clario-gemma4-e4b-lora-v2` on HuggingFace) + an HPO synonym
-   index. Schema correctness 0 → 100 %, synonym-aware name F1 0.209 →
-   0.524, HPO ID F1 via name→lookup 0.349 → 0.524, all measured against a
-   held-out-by-disease eval set. Full numbers and limitations live in
-   the model card.
-
-### Running the sidecar
-
-Requires a CUDA GPU with ~6 GB free VRAM. The adapter (~70 MB) is pulled
-from HuggingFace Hub on first run.
-
-```bash
-cd backend
-pip install -e .[extractor]
-
-# Optional: build the HPO synonym index so the sidecar can resolve
-# canonical names -> HPO IDs. Without it the sidecar still works but
-# omits hpo_id from extracted entities.
-#   - hp.obo:           http://purl.obolibrary.org/obo/hp.obo
-#   - en_product4.xml:  https://www.orphadata.com/data/xml/en_product4.xml
+# Optional: build the HPO synonym index so the sidecar resolves
+# canonical names -> HPO IDs (without it, hpo_id is just omitted).
+#   hp.obo:          http://purl.obolibrary.org/obo/hp.obo
+#   en_product4.xml: https://www.orphadata.com/data/xml/en_product4.xml
 python -m scripts.build_knowledge \
     --hpo-obo path/to/hp.obo \
     --orphanet-xml path/to/en_product4.xml \
     --out data/disease_knowledge.json
 
-# Start the sidecar (loads adapter from HF Hub, ~60 s).
+# Start the sidecar (pulls the ~70 MB adapter from HF Hub, ~60 s).
 CLARIO_KNOWLEDGE_PATH=data/disease_knowledge.json \
     python -m scripts.clario_extractor_service
 ```
 
-Then start the backend with `CLARIO_EXTRACTOR_URL=http://127.0.0.1:11435`
-pointing at the sidecar — `backend/diary/extraction.py` will delegate
-extraction to it. Embeddings still go to Ollama.
+Then start the backend with `CLARIO_EXTRACTOR_URL=http://127.0.0.1:11435` — `backend/diary/extraction.py` delegates extraction to the sidecar; embeddings still go to Ollama.
 
 | Env var | Default | Purpose |
 |---|---|---|
@@ -324,18 +107,99 @@ extraction to it. Embeddings still go to Ollama.
 | `CLARIO_KNOWLEDGE_PATH` | *(unset)* | path to `disease_knowledge.json` |
 | `CLARIO_EXTRACTOR_URL` | *(unset)* | backend uses sidecar when set |
 
-### Published artefacts
+</details>
 
-- Model: <https://huggingface.co/m0rtyddd/clario-gemma4-e4b-lora-v2>
-- Dataset: <https://huggingface.co/datasets/m0rtyddd/clario-synthetic-diary>
+---
 
-Both are CC-BY-4.0 (propagated from HPO + Orphanet attribution).
+## ⚙ How it fits together
 
-## Roadmap
+```
+Browser (React PWA)  ──►  FastAPI (single process, :8765)  ──►  SQLCipher DB + encrypted media
+                                  │
+                                  ├─ background extraction worker ─► Ollama (Gemma + nomic-embed-text)
+                                  │                                  └─ or Clario LoRA sidecar (:11435)
+                                  └─ Hypothesis Engine ─► vector match vs. curated disease KB
+```
 
-See `../symptom-diary-plan (1).md`. Remaining work:
-- **Document extraction LoRA** on Orphanet/PMC pairs (sibling to the
-  diary-extraction LoRA shipped above).
-- **Real Orphanet XML sync** to grow the curated KB beyond the ~40 seed
-  conditions.
-- **Polish** — PyInstaller .exe, Tauri shell, code-signing.
+Every entry enqueues a job; the worker asks Gemma for `{entities, ts_event_hint}` JSON, embeds with `nomic-embed-text`, canonicalizes via cosine search on `sqlite-vec`, and builds `co_occurs` / `precedes` graph edges. The force-directed graph (`/graph`) lets you click, focus, and rename/merge/delete entities. If Ollama is offline, jobs record as `failed` and resume on "Re-extract" — nothing is lost.
+
+---
+
+## ⌥ Developer setup (only if you're changing code)
+
+The one-step launcher above is what you want for everyday use and demos. The two-process dev flow (hot-reload UI on `:5173`, backend on `:8765`):
+
+**Backend** → <http://localhost:8765>
+```bash
+cd backend
+uv venv --python 3.12
+uv pip install -e ".[dev]"
+uv run python -m diary
+```
+
+**Frontend** → <http://localhost:5173>
+```bash
+cd frontend
+npm install
+npm run dev          # Vite proxies /api/* to the backend
+```
+
+<details>
+<summary>Prerequisites & platform notes</summary>
+
+- **Windows (primary target):** Python 3.12, Node 20+. The `sqlcipher3` Windows wheel is bundled — no native build.
+- **macOS / Linux:** `sqlcipher3` builds against system SQLCipher:
+  ```bash
+  brew install sqlcipher                 # macOS
+  # sudo apt install libsqlcipher-dev    # Debian/Ubuntu
+  export SQLCIPHER_PATH=$(brew --prefix sqlcipher)
+  export CFLAGS="-I${SQLCIPHER_PATH}/include -I${SQLCIPHER_PATH}/include/sqlcipher"
+  export LDFLAGS="-L${SQLCIPHER_PATH}/lib"
+  ```
+  *(The launcher sets these automatically on macOS when Homebrew is present.)*
+</details>
+
+<details>
+<summary>Optional: whisper.cpp for audio transcription</summary>
+
+Audio is **always** stored encrypted regardless. To also transcribe:
+1. Build/download `whisper-cli` from <https://github.com/ggerganov/whisper.cpp>
+2. Download a ggml model (e.g. `ggml-small.bin`)
+3. Export before launching the backend:
+   ```bash
+   export DIARY_WHISPER_BIN=/path/to/whisper-cli
+   export DIARY_WHISPER_MODEL=/path/to/ggml-small.bin
+   ```
+</details>
+
+### Tests
+
+```bash
+cd backend
+.venv/bin/pytest -q     # 120 passed
+```
+
+### Storage
+
+- DB: `~/.symptom-diary/data/diary.sqlite` (SQLCipher-encrypted)
+- Salt: `~/.symptom-diary/data/diary.salt`
+- Media: `~/.symptom-diary/data/media/<entry_id>/<media_id>.enc` (libsodium-encrypted)
+- Override the location with `DIARY_DATA_DIR=/some/path`
+
+**There is no recovery.** If you lose the passphrase, the data is gone — by design.
+
+---
+
+## ⤳ Roadmap
+
+- **Document-extraction LoRA** on Orphanet/PMC pairs (sibling to the shipped diary-extraction LoRA).
+- **Real Orphanet XML sync** to grow the curated KB beyond the ~40 seed conditions.
+- **Packaging polish** — PyInstaller `.exe`, Tauri shell, code-signing.
+
+<div align="center">
+
+---
+
+*Clario is a journaling and pattern-surfacing aid — **not a diagnostic device**. Every insight is hedged, cited, and meant to start a conversation with a clinician, never replace one.*
+
+</div>
