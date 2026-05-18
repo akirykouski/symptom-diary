@@ -11,12 +11,14 @@ try:
     import sqlcipher3 as _sqlcipher
     from sqlcipher3.dbapi2 import (
         IntegrityError as _SQLCipherIntegrityError,
+        ProgrammingError as _SQLCipherProgrammingError,
         Row as _SQLCipherRow,
     )
 except ImportError:  # pragma: no cover
     _sqlcipher = None  # type: ignore[assignment]
     _SQLCipherRow = sqlite3.Row  # type: ignore[assignment]
     _SQLCipherIntegrityError = sqlite3.IntegrityError  # type: ignore[assignment]
+    _SQLCipherProgrammingError = sqlite3.ProgrammingError  # type: ignore[assignment]
 
 try:
     import sqlite_vec as _sqlite_vec
@@ -26,6 +28,7 @@ except ImportError:  # pragma: no cover
 
 # Re-exported so route handlers don't import sqlcipher3 directly.
 IntegrityError = _SQLCipherIntegrityError
+ProgrammingError = _SQLCipherProgrammingError
 
 from .config import db_path, migrations_dir
 from .crypto import key_to_pragma_hex
