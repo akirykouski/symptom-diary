@@ -111,7 +111,31 @@ export CFLAGS="-I${SQLCIPHER_PATH}/include -I${SQLCIPHER_PATH}/include/sqlcipher
 export LDFLAGS="-L${SQLCIPHER_PATH}/lib"
 ```
 
+## Quick start (one command)
+
+For everyday use you don't need two terminals or a dev server — one launcher
+sets everything up and serves the whole app on a single local URL.
+
+**Windows** — double-click **`start-windows.bat`** (or right-click
+`run.ps1` → *Run with PowerShell*).
+
+**macOS** — double-click **`Clario.command`** (or run `./run.sh`).
+
+**Linux** — `./run.sh`
+
+The first run creates the Python environment, installs the backend, and
+builds the interface (~2 min, needs Python 3.12+ and Node 20+). Every run
+after that launches instantly and opens your browser at
+<http://127.0.0.1:8765>. Pass `-Rebuild` (Windows) / `--rebuild`
+(macOS/Linux) to force a fresh install + UI rebuild after updating.
+
+Nothing leaves your machine. To stop, close the window or press `Ctrl+C`.
+For AI features, install Ollama from the in-app **AI models** page.
+
 ## Run (dev)
+
+The dev setup (hot-reload frontend on :5173, backend on :8765) is still the
+two-process flow below — use it when changing code, not for everyday use.
 
 ### Backend → http://localhost:8765
 

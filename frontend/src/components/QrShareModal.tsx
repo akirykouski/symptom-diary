@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, QrSession } from "../api/client";
+import { Icons, Modal } from "../ui/clario";
 
 const TTL_OPTIONS = [5, 10, 20, 30];
 
@@ -32,75 +33,170 @@ export default function QrShareModal({ onClose }: { onClose: () => void }) {
   const active = create.data ?? null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
+    <Modal onClose={onClose} width={580}>
+      {/* Header */}
       <div
-        className="bg-canvas border border-ink/15 rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4"
-        onClick={(e) => e.stopPropagation()}
+        style={{
+          padding: "20px 24px 14px",
+          borderBottom: "1px solid var(--border)",
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 12,
+        }}
       >
-        <header className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{t("qr.modalTitle")}</h2>
-          <button onClick={onClose} className="text-ink/60 hover:text-ink" aria-label="close">
-            ✕
-          </button>
-        </header>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>
+            {t("qr.modalTitle", "Share with clinician via QR")}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 3 }}>
+            {t("qr.intro", "Read-only · expires in {{minutes}} min · invalidated the moment you lock the journal", { minutes: ttl })}
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="btn ghost sm"
+          style={{ padding: "0 8px", marginTop: -2 }}
+          aria-label="close"
+        >
+          {Icons.x}
+        </button>
+      </div>
 
-        <p className="text-xs text-ink/55">{t("qr.intro", { minutes: ttl })}</p>
+      {/* Body */}
+      <div
+        style={{
+          padding: 24,
+          display: "grid",
+          gridTemplateColumns: active ? "220px 1fr" : "1fr",
+          gap: 24,
+        }}
+      >
+        {active ? (
+          <>
+            {/* QR column */}
+            <div
+              style={{
+                padding: 14,
+                borderRadius: 14,
+                background: "white",
+                border: "1px solid var(--border)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <img src={active.qr_data_url} alt="QR" style={{ width: 168, height: 168 }} />
+              <div className="mono" style={{ fontSize: 10.5, color: "var(--ink-3)" }}>
+                scoped: brief / read-only
+              </div>
+            </div>
 
-        {!active ? (
-          <div className="space-y-3">
-            <label className="block text-sm">
-              <span className="block text-ink/65 mb-1">{t("qr.ttlLabel")}</span>
-              <select
-                value={ttl}
-                onChange={(e) => setTtl(parseInt(e.target.value, 10))}
-                className="bg-bg/40 border border-ink/15 rounded px-2 py-1 text-sm"
-              >
+            {/* Info column */}
+            <ActiveSession
+              session={active}
+              onRevoke={() => revoke.mutate(active.token)}
+              isRevoking={revoke.isPending}
+            />
+          </>
+        ) : (
+          /* Creation form */
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 12.5, fontWeight: 500, color: "var(--ink-2)", marginBottom: 8 }}>
+                {t("qr.ttlLabel", "Link valid for")}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
                 {TTL_OPTIONS.map((n) => (
-                  <option key={n} value={n}>
-                    {t("qr.ttlMinutes", { count: n })}
-                  </option>
+                  <button
+                    key={n}
+                    onClick={() => setTtl(n)}
+                    style={{
+                      height: 30,
+                      padding: "0 14px",
+                      borderRadius: 999,
+                      cursor: "pointer",
+                      background: ttl === n ? "var(--accent-tint)" : "var(--surface)",
+                      color: ttl === n ? "var(--accent-strong)" : "var(--ink-2)",
+                      border:
+                        "1px solid " +
+                        (ttl === n
+                          ? "color-mix(in oklch, var(--accent) 30%, var(--border))"
+                          : "var(--border)"),
+                      fontSize: 12.5,
+                      fontWeight: ttl === n ? 600 : 500,
+                    }}
+                  >
+                    {t("qr.ttlMinutes", "{{count}} min", { count: n })}
+                  </button>
                 ))}
-              </select>
-            </label>
+              </div>
+            </div>
+
             <button
               onClick={() => create.mutate()}
               disabled={create.isPending}
-              className="w-full bg-accent hover:bg-accent/90 disabled:opacity-50 px-4 py-2 rounded-md text-sm font-medium"
+              className="btn primary"
+              style={{ alignSelf: "flex-start" }}
             >
-              {create.isPending ? t("qr.creating") : t("qr.createBtn")}
+              <span style={{ display: "inline-flex" }}>{Icons.qr}</span>
+              {create.isPending ? t("qr.creating", "Generating…") : t("qr.createBtn", "Generate QR link")}
             </button>
+
+            {/* Existing sessions */}
+            {sessions.data && sessions.data.sessions.length > 0 && (
+              <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+                <div className="k-label" style={{ marginBottom: 8 }}>
+                  Active sessions
+                </div>
+                <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 }}>
+                  {sessions.data.sessions.map((s) => (
+                    <li
+                      key={s.token}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        padding: "6px 8px",
+                        borderRadius: 8,
+                        background: "var(--surface-2)",
+                        border: "1px solid var(--border)",
+                        fontSize: 12,
+                        gap: 8,
+                      }}
+                    >
+                      <span className="mono" style={{ flex: 1, color: "var(--ink-2)" }}>
+                        …{s.token.slice(-8)}
+                      </span>
+                      <span style={{ color: "var(--ink-3)" }}>
+                        {t("qr.fetches", "{{count}} fetches", { count: s.fetches })}
+                      </span>
+                      <button
+                        onClick={() => revoke.mutate(s.token)}
+                        className="btn ghost sm"
+                        style={{ color: "var(--danger)", padding: "0 6px" }}
+                      >
+                        {Icons.x}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
-        ) : (
-          <ActiveSession
-            session={active}
-            onRevoke={() => revoke.mutate(active.token)}
-            isRevoking={revoke.isPending}
-          />
         )}
-
-        {sessions.data && sessions.data.sessions.length > 0 && !active && (
-          <ul className="text-[11px] text-ink/55 space-y-1 pt-2 border-t border-ink/10">
-            {sessions.data.sessions.map((s) => (
-              <li key={s.token} className="flex items-center justify-between">
-                <span className="font-mono truncate mr-2">…{s.token.slice(-8)}</span>
-                <span>{t("qr.fetches", { count: s.fetches })}</span>
-                <button
-                  onClick={() => revoke.mutate(s.token)}
-                  className="text-rose-300 hover:text-rose-200 ml-2"
-                >
-                  ✕
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <p className="text-[11px] text-ink/40">{t("qr.noteLocked")}</p>
       </div>
-    </div>
+
+      {/* Footer note */}
+      <div
+        style={{
+          padding: "0 24px 20px",
+          fontSize: 11,
+          color: "var(--ink-4)",
+        }}
+      >
+        {t("qr.noteLocked", "The session is immediately invalidated when the journal is locked.")}
+      </div>
+    </Modal>
   );
 }
 
@@ -121,42 +217,78 @@ function ActiveSession({
   }, []);
   const expiresAt = new Date(session.expires_at).getTime();
   const secondsLeft = Math.max(0, Math.floor((expiresAt - now) / 1000));
+  const mins = Math.floor(secondsLeft / 60);
+  const secs = secondsLeft % 60;
 
   return (
-    <div className="space-y-3">
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {!session.lan_ok && (
-        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200">
-          {t("qr.lanWarning")}
+        <div
+          style={{
+            padding: "8px 12px",
+            borderRadius: 8,
+            background: "var(--warn-tint)",
+            border: "1px solid color-mix(in oklch, var(--warn) 30%, var(--border))",
+            fontSize: 12,
+            color: "oklch(48% 0.12 75)",
+          }}
+        >
+          {t("qr.lanWarning", "Not on the same WiFi — the phone may not reach this machine.")}
         </div>
       )}
-      <div className="bg-white rounded-md p-3 flex items-center justify-center">
-        {/* qr_data_url is `data:image/svg+xml;base64,…` */}
-        <img src={session.qr_data_url} alt="QR" className="w-56 h-56" />
-      </div>
-      <div className="text-[11px] text-ink/65 space-y-1">
-        <div className="flex items-center justify-between">
-          <span>{t("qr.expiresIn", { seconds: secondsLeft })}</span>
-          <span>{t("qr.fetches", { count: session.fetches })}</span>
-        </div>
-        <div>
-          <span className="text-ink/45 mr-1">{t("qr.url")}:</span>
-          <a
-            href={session.url}
-            target="_blank"
-            rel="noreferrer"
-            className="font-mono break-all text-accent hover:underline"
-          >
-            {session.url}
-          </a>
-        </div>
-      </div>
-      <button
-        onClick={onRevoke}
-        disabled={isRevoking}
-        className="w-full px-4 py-2 rounded-md border border-rose-500/40 text-rose-200 hover:bg-rose-500/10 text-sm"
+
+      {/* Status row */}
+      <div
+        style={{
+          padding: 12,
+          borderRadius: 10,
+          background: "var(--surface-2)",
+          border: "1px solid var(--border)",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          fontSize: 12.5,
+          color: "var(--ink-2)",
+        }}
       >
-        {isRevoking ? t("qr.revoking") : t("qr.revoke")}
-      </button>
+        <span style={{ color: "var(--accent)", display: "inline-flex" }}>{Icons.shield}</span>
+        <span>
+          <b style={{ color: "var(--ink)" }}>
+            {t("qr.fetches", "Opened {{count}} times.", { count: session.fetches })}
+          </b>{" "}
+          {t("qr.expiresIn", "Expires in", { seconds: secondsLeft })}{" "}
+          <span className="mono">
+            {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
+          </span>
+        </span>
+        <button
+          onClick={onRevoke}
+          disabled={isRevoking}
+          className="btn danger sm"
+          style={{ marginLeft: "auto" }}
+        >
+          {isRevoking ? t("qr.revoking", "Revoking…") : t("qr.revoke", "Revoke now")}
+        </button>
+      </div>
+
+      {/* URL */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ fontSize: 12, color: "var(--ink-3)" }}>{t("qr.url", "URL")}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input
+            className="input mono"
+            value={session.url}
+            readOnly
+            style={{ fontSize: 12, flex: 1 }}
+          />
+          <button
+            className="btn sm"
+            onClick={() => void navigator.clipboard?.writeText(session.url)}
+          >
+            Copy
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

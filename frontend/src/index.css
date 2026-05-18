@@ -1,51 +1,233 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap');
 @import "vis-timeline/styles/vis-timeline-graph2d.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
-  height: 100%;
+/* ───────────────────────────────────────────────────────────────────────────
+   Clario design system — light, calm clinical theme.
+   Ported from the Clario design handoff (tokens.css) and wired into the
+   existing Tailwind app. Tailwind's `canvas` / `ink` / `accent` colour
+   aliases are remapped (see tailwind.config.js) so legacy utility classes
+   degrade gracefully onto the new palette.
+   ─────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Spacing scale (4-based) */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px; --s-5: 20px;
+  --s-6: 24px; --s-7: 32px; --s-8: 48px; --s-9: 64px;
+
+  /* Type scale */
+  --t-xs: 11px; --t-sm: 12.5px; --t-base: 13.5px; --t-md: 15px;
+  --t-lg: 17px; --t-xl: 22px; --t-2xl: 28px; --t-3xl: 34px;
+  --lh-tight: 1.25; --lh-normal: 1.5; --lh-relax: 1.65;
+
+  /* Motion */
+  --d-fast: 120ms; --d-base: 200ms; --ease: cubic-bezier(.2, .8, .2, 1);
+
+  /* Surfaces */
+  --bg:        oklch(98.4% 0.006 80);
+  --surface:   #ffffff;
+  --surface-2: oklch(96.6% 0.008 80);
+  --surface-3: oklch(94% 0.010 80);
+  --border:    oklch(90% 0.008 80);
+  --border-2:  oklch(85% 0.010 80);
+
+  /* Ink */
+  --ink:   oklch(20% 0.02 255);
+  --ink-2: oklch(40% 0.02 255);
+  --ink-3: oklch(55% 0.015 255);
+  --ink-4: oklch(70% 0.010 255);
+
+  /* Accent — calm medical teal-blue */
+  --accent:        oklch(54% 0.11 215);
+  --accent-strong: oklch(46% 0.12 215);
+  --accent-fg:     #ffffff;
+  --accent-tint:   oklch(95% 0.035 215);
+  --accent-tint-2: oklch(91% 0.05 215);
+  --accent-ring:   oklch(78% 0.08 215);
+
+  /* Secondary palette */
+  --sage:        oklch(58% 0.10 155);
+  --sage-tint:   oklch(95% 0.035 155);
+  --coral:       oklch(62% 0.14 30);
+  --coral-tint:  oklch(95% 0.035 30);
+  --amber:       oklch(68% 0.13 78);
+  --amber-tint:  oklch(95% 0.04 78);
+  --violet:      oklch(56% 0.11 290);
+  --violet-tint: oklch(95% 0.035 290);
+
+  /* Status semantics */
+  --ok: var(--sage);     --ok-tint: var(--sage-tint);
+  --warn: var(--amber);  --warn-tint: var(--amber-tint);
+  --danger: var(--coral);--danger-tint: var(--coral-tint);
+  --info: oklch(55% 0.10 245); --info-tint: oklch(95% 0.032 245);
+
+  /* Radii */
+  --r-sm: 6px; --r: 10px; --r-lg: 14px; --r-xl: 18px;
+
+  /* Shadows */
+  --shadow-1: 0 1px 2px rgba(20, 28, 40, 0.05);
+  --shadow-2: 0 1px 2px rgba(20, 28, 40, 0.05), 0 8px 24px rgba(20, 28, 40, 0.07);
+  --shadow-3: 0 4px 12px rgba(20, 28, 40, 0.07), 0 18px 60px rgba(20, 28, 40, 0.12);
+
+  /* Density */
+  --row-h: 36px; --pad-x: 16px;
 }
+
+[data-density="cozy"] { --row-h: 44px; --pad-x: 20px; }
+
+html, body, #root { height: 100%; }
+* { box-sizing: border-box; }
 
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  font-family: 'Geist', -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+  font-feature-settings: 'ss01', 'ss02', 'cv11';
+  color: var(--ink);
+  background: var(--bg);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
+.mono {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-feature-settings: 'tnum', 'zero';
+}
+
+/* Scrollbar — quiet */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: oklch(88% 0.005 250);
+  border-radius: 10px; border: 2px solid var(--bg);
+}
+*::-webkit-scrollbar-thumb:hover { background: oklch(80% 0.008 250); }
+
+/* Focus ring (a11y) */
+:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+  transition: outline-color var(--d-fast) var(--ease);
+}
+button { font-family: inherit; }
+button:focus-visible { outline-offset: 3px; }
+
+/* ─── Reusable atoms ─────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 32px; padding: 0 12px;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px; font-weight: 500;
+  cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s;
+  text-decoration: none;
+}
+.btn:hover { background: var(--surface-2); border-color: var(--border-2); }
+.btn:disabled { opacity: .55; cursor: default; }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn.primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--ink-2); }
+.btn.ghost:hover { background: var(--surface-2); color: var(--ink); }
+.btn.sm { height: 26px; padding: 0 9px; font-size: 12px; gap: 6px; }
+.btn.danger { color: var(--danger); border-color: color-mix(in oklch, var(--danger) 25%, var(--border)); }
+.btn.danger:hover { background: var(--danger-tint); }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 22px; padding: 0 8px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 500;
+  background: var(--surface-2); color: var(--ink-2);
+  border: 1px solid var(--border);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+
+.input {
+  width: 100%; height: 36px;
+  padding: 0 12px; border-radius: var(--r);
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--ink); font-size: 13.5px; font-family: inherit;
+}
+.input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
+textarea.input { height: auto; padding: 10px 12px; line-height: 1.5; resize: vertical; }
+
+.h-divider { height: 1px; background: var(--border); }
+.k-label {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--ink-3); font-weight: 500;
+}
+
+.navrow {
+  display: flex; align-items: center; gap: 10px;
+  height: 32px; padding: 0 10px;
+  border-radius: 8px;
+  font-size: 13px; color: var(--ink-2);
+  cursor: pointer; user-select: none;
+  transition: background .12s ease, color .12s ease;
+  border: none; background: transparent; width: 100%;
+  text-align: left; font-family: inherit;
+}
+.navrow:hover { background: var(--surface-2); color: var(--ink); }
+.navrow.active { background: var(--accent-tint); color: var(--accent-strong); font-weight: 500; }
+.navrow .ic { width: 16px; height: 16px; opacity: .9; }
+
+@keyframes fadeUp { from { transform: translateY(3px); } to { transform: translateY(0); } }
+.route-fade { animation: fadeUp .22s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .route-fade { animation: none; } }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes modalIn { from { transform: scale(.97); } to { transform: scale(1); } }
+.modal-in { animation: modalIn .18s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .modal-in { animation: none; } }
+
+@keyframes pulseDot { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.4); opacity: .6; } }
+.pulse-dot { animation: pulseDot 2s ease-in-out infinite; }
+
+/* ─── vis-timeline — light Clario theme ──────────────────────────────── */
 .vis-timeline {
-  border: 1px solid #2a2a35 !important;
-  background: #14141a;
-  color: #e8e8ee;
+  border: 1px solid var(--border) !important;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: 'Geist', system-ui, sans-serif;
 }
-.vis-time-axis .vis-text {
-  color: #8a8a98 !important;
-}
+.vis-time-axis .vis-text { color: var(--ink-3) !important; }
+.vis-time-axis .vis-grid.vis-minor { border-color: var(--border) !important; }
+.vis-panel.vis-center, .vis-panel.vis-left, .vis-panel.vis-right,
+.vis-panel.vis-top, .vis-panel.vis-bottom { border-color: var(--border) !important; }
 .vis-item {
-  background: #2a2a3f !important;
-  border-color: #4a4a6a !important;
-  color: #e8e8ee !important;
-  border-radius: 4px !important;
+  background: var(--accent-tint) !important;
+  border-color: color-mix(in oklch, var(--accent) 40%, var(--border)) !important;
+  color: var(--ink) !important;
+  border-radius: 6px !important;
   font-size: 12px !important;
 }
 .vis-item.vis-selected {
-  background: #7c5cff !important;
-  border-color: #7c5cff !important;
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent-fg) !important;
 }
 .vis-item.vis-sev-low {
-  background: rgba(74, 222, 128, 0.15) !important;
-  border-color: rgba(74, 222, 128, 0.55) !important;
+  background: color-mix(in oklch, var(--sage) 16%, white) !important;
+  border-color: color-mix(in oklch, var(--sage) 45%, var(--border)) !important;
 }
 .vis-item.vis-sev-mid {
-  background: rgba(251, 191, 36, 0.18) !important;
-  border-color: rgba(251, 191, 36, 0.6) !important;
+  background: color-mix(in oklch, var(--amber) 18%, white) !important;
+  border-color: color-mix(in oklch, var(--amber) 50%, var(--border)) !important;
 }
 .vis-item.vis-sev-high {
-  background: rgba(251, 113, 133, 0.22) !important;
-  border-color: rgba(251, 113, 133, 0.7) !important;
-  box-shadow: 0 0 12px rgba(251, 113, 133, 0.25);
+  background: color-mix(in oklch, var(--coral) 18%, white) !important;
+  border-color: color-mix(in oklch, var(--coral) 55%, var(--border)) !important;
 }
 .vis-item.vis-sev-none {
-  background: rgba(124, 92, 255, 0.10) !important;
-  border-color: rgba(124, 92, 255, 0.45) !important;
+  background: var(--surface-2) !important;
+  border-color: var(--border-2) !important;
 }

@@ -29,6 +29,22 @@ def migrations_dir() -> Path:
     return Path(__file__).parent / "migrations"
 
 
+def frontend_dist() -> Path | None:
+    """Built single-page app to serve in production / for end users.
+
+    Returns the directory containing ``index.html`` if a build exists,
+    otherwise ``None`` (development — the Vite dev server is used instead).
+    Override the location with ``DIARY_FRONTEND_DIST``.
+    """
+    override = os.environ.get("DIARY_FRONTEND_DIST")
+    candidate = (
+        Path(override).expanduser().resolve()
+        if override
+        else Path(__file__).resolve().parents[2] / "frontend" / "dist"
+    )
+    return candidate if (candidate / "index.html").is_file() else None
+
+
 # Session inactivity timeout (auto-lock).
 SESSION_TIMEOUT_SECONDS = 15 * 60
 

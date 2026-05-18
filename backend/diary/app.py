@@ -25,6 +25,7 @@ from .routes.mobile import router as mobile_router
 from .routes.ollama_admin import router as ollama_admin_router
 from .routes.share import router as share_router
 from .routes.tags import router as tags_router
+from .static import mount_spa
 
 
 @asynccontextmanager
@@ -73,3 +74,8 @@ app.include_router(mobile_router)
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+# Serve the built SPA for end users (no-op in dev). Registered last so the
+# catch-all never shadows the API routes above.
+mount_spa(app)

@@ -13,9 +13,10 @@ import LabsPage from "./pages/LabsPage";
 import MedicationsPage from "./pages/MedicationsPage";
 import HypothesesPage from "./pages/HypothesesPage";
 import InsightsPage from "./pages/InsightsPage";
+import MobileCompanion from "./pages/MobileCompanion";
 import MobileCapture from "./pages/MobileCapture";
 import MobilePair from "./pages/MobilePair";
-import SafetyBanner from "./components/SafetyBanner";
+import AppShell from "./components/AppShell";
 
 export default function App() {
   const qc = useQueryClient();
@@ -37,8 +38,7 @@ export default function App() {
 
   // Inactivity heartbeat: while unlocked, ping /api/auth/heartbeat on real
   // user input (debounced to once per 30s) so the journal only auto-locks
-  // after a real period of idleness — not while the user is reading the
-  // brief or scrolling labs without making other API calls.
+  // after a real period of idleness.
   const unlockedNow = status.data?.unlocked === true;
   useEffect(() => {
     if (!unlockedNow || typeof window === "undefined") return;
@@ -48,7 +48,7 @@ export default function App() {
       if (t - lastBump < 30_000) return;
       lastBump = t;
       api.heartbeat().catch(() => {
-        // ignore — if the call 401s, the locked handler above takes over.
+        /* ignore — if the call 401s, the locked handler above takes over. */
       });
     };
     const events: (keyof WindowEventMap)[] = [
@@ -68,13 +68,11 @@ export default function App() {
   // session cookie. Skip the auth-gate Routes entirely on `/m/*`.
   if (typeof window !== "undefined" && window.location.pathname.startsWith("/m/")) {
     return (
-      <div className="h-full flex flex-col">
-        <Routes>
-          <Route path="/m/pair" element={<MobilePair />} />
-          <Route path="/m/capture" element={<MobileCapture />} />
-          <Route path="*" element={<Navigate to="/m/capture" replace />} />
-        </Routes>
-      </div>
+      <Routes>
+        <Route path="/m/pair" element={<MobilePair />} />
+        <Route path="/m/capture" element={<MobileCapture />} />
+        <Route path="*" element={<Navigate to="/m/capture" replace />} />
+      </Routes>
     );
   }
 
@@ -86,18 +84,13 @@ export default function App() {
   }
 
   const { setup, unlocked } = status.data;
-
-  return (
-    <div className="h-full flex flex-col">
-      {unlocked && <SafetyBanner />}
-      <div className="flex-1 min-h-0">
-        <AppRoutes setup={setup} unlocked={unlocked} />
-      </div>
-    </div>
-  );
+  return <AppRoutes setup={setup} unlocked={unlocked} />;
 }
 
 function AppRoutes({ setup, unlocked }: { setup: boolean; unlocked: boolean }) {
+  const gate = (el: React.ReactNode) =>
+    !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : el;
+
   return (
     <Routes>
       <Route
@@ -106,64 +99,23 @@ function AppRoutes({ setup, unlocked }: { setup: boolean; unlocked: boolean }) {
       />
       <Route
         path="/unlock"
-        element={
-          !setup ? <Navigate to="/setup" /> : unlocked ? <Navigate to="/" /> : <Unlock />
-        }
+        element={!setup ? <Navigate to="/setup" /> : unlocked ? <Navigate to="/" /> : <Unlock />}
       />
-      <Route
-        path="/"
-        element={
-          !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : <Timeline />
-        }
-      />
-      <Route
-        path="/tags"
-        element={
-          !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : <Tags />
-        }
-      />
-      <Route
-        path="/graph"
-        element={
-          !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : <GraphPage />
-        }
-      />
-      <Route
-        path="/llm"
-        element={
-          !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : <LlmSetup />
-        }
-      />
-      <Route
-        path="/documents"
-        element={
-          !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : <DocumentsPage />
-        }
-      />
-      <Route
-        path="/labs"
-        element={
-          !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : <LabsPage />
-        }
-      />
-      <Route
-        path="/medications"
-        element={
-          !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : <MedicationsPage />
-        }
-      />
-      <Route
-        path="/hypotheses"
-        element={
-          !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : <HypothesesPage />
-        }
-      />
-      <Route
-        path="/insights"
-        element={
-          !setup ? <Navigate to="/setup" /> : !unlocked ? <Navigate to="/unlock" /> : <InsightsPage />
-        }
-      />
+
+      {/* Unlocked screens share the persistent Clario shell */}
+      <Route element={<AppShell />}>
+        <Route path="/" element={gate(<Timeline />)} />
+        <Route path="/tags" element={gate(<Tags />)} />
+        <Route path="/graph" element={gate(<GraphPage />)} />
+        <Route path="/llm" element={gate(<LlmSetup />)} />
+        <Route path="/documents" element={gate(<DocumentsPage />)} />
+        <Route path="/labs" element={gate(<LabsPage />)} />
+        <Route path="/medications" element={gate(<MedicationsPage />)} />
+        <Route path="/hypotheses" element={gate(<HypothesesPage />)} />
+        <Route path="/insights" element={gate(<InsightsPage />)} />
+        <Route path="/mobile" element={gate(<MobileCompanion />)} />
+      </Route>
+
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
@@ -171,7 +123,16 @@ function AppRoutes({ setup, unlocked }: { setup: boolean; unlocked: boolean }) {
 
 function FullScreenMessage({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-center h-full text-ink/60">
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100%",
+        color: "var(--ink-3)",
+        fontSize: 14,
+      }}
+    >
       {children}
     </div>
   );

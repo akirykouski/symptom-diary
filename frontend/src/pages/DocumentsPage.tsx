@@ -1,335 +1,654 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { DocumentRecord } from "../api/client";
 import { api } from "../api/client";
+import { Icons, Pill, ScreenHeader, Tab, Section } from "../ui/clario";
+import type { Tone } from "../ui/clario";
+import { DEMO, pick } from "../ui/demo";
+import type { DemoDoc, DemoLab } from "../ui/demo";
 
-const DOC_TYPES = [
-  "visit_note",
-  "lab_result",
-  "prescription",
-  "imaging",
-  "discharge",
-  "referral",
-  "other",
-];
+/* ─── Doc type metadata ──────────────────────────────────────────────── */
+const DOC_TYPE_META: Record<string, { label: string; tone: Tone }> = {
+  visit_note:   { label: "Visit note",   tone: "accent"  },
+  lab_result:   { label: "Lab result",   tone: "info"    },
+  prescription: { label: "Prescription", tone: "ok"      },
+  imaging:      { label: "Imaging",      tone: "warn"    },
+  discharge:    { label: "Discharge",    tone: "neutral" },
+  referral:     { label: "Referral",     tone: "neutral" },
+  other:        { label: "Document",     tone: "neutral" },
+};
 
+function docMeta(type: string) {
+  return DOC_TYPE_META[type] ?? { label: "Document", tone: "neutral" as Tone };
+}
+
+/* ─── Shapes used internally ─────────────────────────────────────────── */
+type LabRow = {
+  id: string;
+  test: string;
+  value: string | number;
+  unit: string;
+  ref: string;
+  flag: "low" | "high" | "normal";
+};
+
+type DocShape = {
+  id: string;
+  type: string;
+  title: string;
+  date: string;
+  clinician: string;
+  specialty: string;
+  facility: string;
+  findings?: string;
+  recommendations?: string;
+  verified: boolean;
+  hasMedia: boolean;
+  labRows: LabRow[];
+  /** real record for mutations; absent in demo mode */
+  _real?: DocumentRecord;
+};
+
+function realToShape(d: DocumentRecord): DocShape {
+  return {
+    id: d.id,
+    type: d.doc_type,
+    title: docMeta(d.doc_type).label,
+    date: d.doc_date ?? d.created_at.slice(0, 10),
+    clinician: d.clinician_name ?? "—",
+    specialty: d.clinician_specialty ?? "—",
+    facility: d.facility ?? "—",
+    findings: d.findings_md ?? undefined,
+    recommendations: d.recommendations_md ?? undefined,
+    verified: d.user_verified === 1,
+    hasMedia: !!d.media_id,
+    labRows: d.lab_values.map((lv) => ({
+      id: lv.id,
+      test: lv.test_name_raw,
+      value: lv.value_numeric ?? lv.value_text ?? "—",
+      unit: lv.unit ?? "—",
+      ref:
+        lv.reference_low != null || lv.reference_high != null
+          ? `${lv.reference_low ?? "?"} – ${lv.reference_high ?? "?"}`
+          : "—",
+      flag:
+        lv.is_abnormal === -1
+          ? "low"
+          : lv.is_abnormal === 1
+            ? lv.reference_high != null &&
+              Number(lv.value_numeric) > Number(lv.reference_high)
+              ? "high"
+              : "low"
+            : "normal",
+    })),
+    _real: d,
+  };
+}
+
+function demoToShape(d: DemoDoc, labs: DemoLab[]): DocShape {
+  return {
+    id: d.id,
+    type: d.type,
+    title: d.title,
+    date: d.date,
+    clinician: d.clinician,
+    specialty: d.specialty,
+    facility: d.facility,
+    findings: d.findings,
+    recommendations: d.recommendations,
+    verified: d.verified,
+    hasMedia: d.hasMedia,
+    labRows: labs
+      .filter((l) => l.docId === d.id)
+      .map((l) => ({
+        id: l.id,
+        test: l.test,
+        value: l.value,
+        unit: l.unit,
+        ref: l.ref,
+        flag: l.flag,
+      })),
+  };
+}
+
+/* ─── Page ───────────────────────────────────────────────────────────── */
 export default function DocumentsPage() {
   const { t } = useTranslation();
-  const [filter, setFilter] = useState<string | undefined>(undefined);
-  const [selected, setSelected] = useState<DocumentRecord | null>(null);
+  const [filter, setFilter] = useState<string>("all");
 
-  const docs = useQuery({
-    queryKey: ["documents", { type: filter }],
-    queryFn: () => api.listDocuments(filter ? { type: filter } : undefined),
+  const docsQuery = useQuery({
+    queryKey: ["documents", { type: filter === "all" ? undefined : filter }],
+    queryFn: () =>
+      api.listDocuments(filter !== "all" ? { type: filter } : undefined),
   });
 
+  const { rows: rawRows, isDemo } = pick(docsQuery.data, DEMO.documents);
+
+  // Build unified DocShape list
+  const docs: DocShape[] = isDemo
+    ? (rawRows as DemoDoc[]).map((d) => demoToShape(d, DEMO.labValues))
+    : (rawRows as DocumentRecord[]).map(realToShape);
+
+  // Apply filter in demo mode (real API filters server-side)
+  const visibleDocs =
+    isDemo && filter !== "all"
+      ? docs.filter((d) => d.type === filter)
+      : docs;
+
+  // Count per type for tabs (across all docs, not filtered)
+  const allDocs: DocShape[] = isDemo
+    ? (DEMO.documents as DemoDoc[]).map((d) => demoToShape(d, DEMO.labValues))
+    : (docsQuery.data ?? []).map(realToShape);
+
+  const countAll = allDocs.length;
+  const countByType = (type: string) => allDocs.filter((d) => d.type === type).length;
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Auto-select first when list changes
+  const effectiveSelected =
+    visibleDocs.find((d) => d.id === selectedId) ?? visibleDocs[0] ?? null;
+
   return (
-    <div className="h-full flex flex-col">
-      <header className="border-b border-ink/10 px-6 py-3 flex items-center gap-4">
-        <Link to="/" className="text-ink/60 hover:text-ink">
-          ← {t("nav.timeline")}
-        </Link>
-        <h1 className="text-lg font-semibold">{t("documents.heading")}</h1>
-        <div className="flex items-center gap-2 ml-4 flex-wrap">
-          <button
-            onClick={() => setFilter(undefined)}
-            className={`text-sm px-2 py-1 rounded ${
-              filter === undefined ? "bg-accent/20 text-ink" : "text-ink/60 hover:text-ink"
-            }`}
-          >
-            {t("documents.all")}
-          </button>
-          {DOC_TYPES.map((dt) => (
-            <button
-              key={dt}
-              onClick={() => setFilter(dt)}
-              className={`text-sm px-2 py-1 rounded ${
-                filter === dt ? "bg-accent/20 text-ink" : "text-ink/60 hover:text-ink"
-              }`}
-            >
-              {t(`documents.types.${dt}`)}
-            </button>
-          ))}
-        </div>
-        <div className="ml-auto flex gap-3">
-          <Link to="/labs" className="text-sm text-ink/60 hover:text-ink">
-            {t("documents.labsLink")}
-          </Link>
-          <Link to="/medications" className="text-sm text-ink/60 hover:text-ink">
-            {t("documents.medsLink")}
-          </Link>
-        </div>
-      </header>
-      <main className="flex-1 min-h-0 overflow-y-auto p-6">
-        {docs.isLoading ? (
-          <div className="text-ink/60">{t("documents.loading")}</div>
-        ) : docs.data && docs.data.length === 0 ? (
-          <div className="text-ink/60">{t("documents.empty")}</div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {(docs.data ?? []).map((d) => (
-              <DocumentCard key={d.id} doc={d} onSelect={() => setSelected(d)} />
-            ))}
-          </div>
+    <>
+      <ScreenHeader
+        title={t("documents.heading", "Medical documents")}
+        sub={t(
+          "documents.sub",
+          "Visit notes, labs and prescriptions you've attached. Vision-AI extracts fields you can verify.",
         )}
-      </main>
-      {selected && (
-        <DocumentDetailModal doc={selected} onClose={() => setSelected(null)} />
-      )}
+        tabs={
+          <>
+            <Tab
+              active={filter === "all"}
+              onClick={() => setFilter("all")}
+              count={countAll}
+            >
+              {t("documents.all", "All")}
+            </Tab>
+            {Object.entries(DOC_TYPE_META)
+              .filter(([k]) => k !== "other")
+              .map(([k, v]) => {
+                const c = countByType(k);
+                if (!c) return null;
+                return (
+                  <Tab
+                    key={k}
+                    active={filter === k}
+                    onClick={() => setFilter(k)}
+                    count={c}
+                  >
+                    {t(`documents.types.${k}`, v.label)}
+                  </Tab>
+                );
+              })}
+          </>
+        }
+        actions={
+          <>
+            {isDemo && (
+              <span
+                className="pill"
+                style={{ fontSize: 10.5, height: 20, lineHeight: "20px" }}
+              >
+                sample data
+              </span>
+            )}
+            <button className="btn" disabled>
+              <span style={{ display: "inline-flex" }}>{Icons.paperclip}</span>
+              {t("documents.attach", "Attach document")}
+            </button>
+          </>
+        }
+      />
+
+      <div
+        style={{
+          flex: 1,
+          overflow: "hidden",
+          display: "grid",
+          gridTemplateColumns: "380px 1fr",
+          minHeight: 0,
+        }}
+      >
+        {/* ── Left: list ────────────────────────────────────────── */}
+        <div
+          style={{
+            overflow: "auto",
+            borderRight: "1px solid var(--border)",
+            padding: "14px 16px 24px",
+          }}
+        >
+          {docsQuery.isLoading && !isDemo ? (
+            <div style={{ color: "var(--ink-3)", fontSize: 13, padding: 8 }}>
+              {t("documents.loading", "Loading…")}
+            </div>
+          ) : visibleDocs.length === 0 ? (
+            <div style={{ color: "var(--ink-3)", fontSize: 13, padding: 8 }}>
+              {t("documents.empty", "No documents.")}
+            </div>
+          ) : (
+            visibleDocs.map((doc) => (
+              <DocCard
+                key={doc.id}
+                doc={doc}
+                active={doc.id === effectiveSelected?.id}
+                onClick={() => setSelectedId(doc.id)}
+              />
+            ))
+          )}
+        </div>
+
+        {/* ── Right: detail ─────────────────────────────────────── */}
+        <div
+          style={{
+            overflow: "auto",
+            padding: "22px 28px 28px",
+            background: "var(--surface-2)",
+          }}
+        >
+          {effectiveSelected ? (
+            <DocDetail doc={effectiveSelected} isDemo={isDemo} />
+          ) : (
+            <div
+              style={{ color: "var(--ink-3)", fontSize: 13, padding: "16px 0" }}
+            >
+              {t("documents.selectPrompt", "Select a document on the left.")}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ─── DocCard ────────────────────────────────────────────────────────── */
+function DocCard({
+  doc,
+  active,
+  onClick,
+}: {
+  doc: DocShape;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const { t } = useTranslation();
+  const tm = docMeta(doc.type);
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        padding: 14,
+        borderRadius: 12,
+        marginBottom: 8,
+        cursor: "pointer",
+        background: active ? "var(--surface)" : "transparent",
+        border:
+          "1px solid " +
+          (active
+            ? "color-mix(in oklch, var(--accent) 25%, var(--border))"
+            : "transparent"),
+        boxShadow: active
+          ? "0 1px 2px rgba(20,28,40,.04), 0 4px 12px rgba(20,28,40,.04)"
+          : "none",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 6,
+        }}
+      >
+        <Pill tone={tm.tone}>
+          {t(`documents.types.${doc.type}`, tm.label)}
+        </Pill>
+        {doc.verified ? (
+          <Pill tone="ok">
+            <span style={{ display: "inline-flex", width: 11, height: 11 }}>
+              {Icons.check}
+            </span>
+            {t("documents.verified", "verified")}
+          </Pill>
+        ) : (
+          <Pill tone="warn">
+            <span style={{ display: "inline-flex", width: 11, height: 11 }}>
+              {Icons.alert}
+            </span>
+            {t("documents.needsReview", "needs review")}
+          </Pill>
+        )}
+        <span
+          className="mono"
+          style={{ marginLeft: "auto", fontSize: 11, color: "var(--ink-3)" }}
+        >
+          {doc.date}
+        </span>
+      </div>
+      <div style={{ fontSize: 13.5, fontWeight: 500, color: "var(--ink)" }}>
+        {doc.title}
+      </div>
+      <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
+        {doc.clinician}
+        {doc.facility && doc.facility !== "—" ? ` · ${doc.facility}` : ""}
+      </div>
     </div>
   );
 }
 
-function DocumentCard({
+/* ─── DocDetail ──────────────────────────────────────────────────────── */
+function DocDetail({
   doc,
-  onSelect,
+  isDemo,
 }: {
-  doc: DocumentRecord;
-  onSelect: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <button
-      onClick={onSelect}
-      className="text-left bg-ink/5 border border-ink/10 hover:border-accent/40 rounded-lg p-4 transition-colors"
-    >
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs uppercase text-accent">
-          {t(`documents.types.${doc.doc_type}`)}
-        </span>
-        {doc.user_verified === 1 ? (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300">
-            {t("documents.verified")}
-          </span>
-        ) : (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">
-            {t("documents.aiOnly")}
-          </span>
-        )}
-      </div>
-      <div className="text-sm font-medium">
-        {doc.clinician_name ?? t("documents.unknownClinician")}
-        {doc.clinician_specialty && (
-          <span className="text-ink/50"> · {doc.clinician_specialty}</span>
-        )}
-      </div>
-      <div className="text-xs text-ink/50 mt-1">
-        {doc.doc_date ?? doc.created_at.slice(0, 10)}
-        {doc.facility && <span> · {doc.facility}</span>}
-      </div>
-      {doc.findings_md && (
-        <div className="text-xs text-ink/70 mt-2 line-clamp-3">
-          {doc.findings_md}
-        </div>
-      )}
-      <div className="flex gap-2 mt-3 text-[11px] text-ink/50">
-        {doc.lab_values.length > 0 && (
-          <span>{doc.lab_values.length} labs</span>
-        )}
-        {doc.medications.length > 0 && (
-          <span>{doc.medications.length} meds</span>
-        )}
-      </div>
-    </button>
-  );
-}
-
-function DocumentDetailModal({
-  doc,
-  onClose,
-}: {
-  doc: DocumentRecord;
-  onClose: () => void;
+  doc: DocShape;
+  isDemo: boolean;
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const [draft, setDraft] = useState<DocumentRecord>(doc);
+  const tm = docMeta(doc.type);
 
-  const save = useMutation({
-    mutationFn: (body: Partial<DocumentRecord>) => api.patchDocument(doc.id, body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["documents"] });
-      onClose();
-    },
+  const verify = useMutation({
+    mutationFn: () => api.patchDocument(doc._real!.id, { user_verified: 1 }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["documents"] }),
   });
 
   return (
-    <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
+    <div className="card" style={{ padding: 24, boxShadow: "var(--shadow-1)" }}>
+      {/* Header row */}
       <div
-        className="bg-canvas border border-ink/20 rounded-xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto space-y-4"
-        onClick={(e) => e.stopPropagation()}
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 18,
+        }}
       >
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">
-            {t(`documents.types.${doc.doc_type}`)}
+        <div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 8,
+            }}
+          >
+            <Pill tone={tm.tone}>
+              {t(`documents.types.${doc.type}`, tm.label)}
+            </Pill>
+            {doc.verified ? (
+              <Pill tone="ok">
+                {t("documents.verifiedByYou", "verified by you")}
+              </Pill>
+            ) : (
+              <Pill tone="warn">
+                {t("documents.awaitingVerification", "awaiting verification")}
+              </Pill>
+            )}
+          </div>
+          <h2
+            style={{
+              margin: 0,
+              fontSize: 22,
+              fontWeight: 600,
+              letterSpacing: -0.3,
+              color: "var(--ink)",
+            }}
+          >
+            {doc.title}
           </h2>
-          <a
-            href={api.mediaUrl(doc.media_id)}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm text-accent hover:underline"
+          <div
+            style={{ marginTop: 6, fontSize: 13, color: "var(--ink-2)" }}
           >
-            {t("documents.openOriginal")}
-          </a>
-        </div>
-
-        <DisclaimerBanner />
-
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <Field label={t("documents.fields.docDate")} value={draft.doc_date}
-            onChange={(v) => setDraft({ ...draft, doc_date: v })} />
-          <Field label={t("documents.fields.clinician")} value={draft.clinician_name}
-            onChange={(v) => setDraft({ ...draft, clinician_name: v })} />
-          <Field label={t("documents.fields.specialty")} value={draft.clinician_specialty}
-            onChange={(v) => setDraft({ ...draft, clinician_specialty: v })} />
-          <Field label={t("documents.fields.facility")} value={draft.facility}
-            onChange={(v) => setDraft({ ...draft, facility: v })} />
-        </div>
-
-        <FieldArea label={t("documents.fields.findings")} value={draft.findings_md}
-          onChange={(v) => setDraft({ ...draft, findings_md: v })} />
-        <FieldArea label={t("documents.fields.recommendations")}
-          value={draft.recommendations_md}
-          onChange={(v) => setDraft({ ...draft, recommendations_md: v })} />
-
-        {doc.lab_values.length > 0 && (
-          <div>
-            <h3 className="text-sm font-medium mb-2">{t("documents.labs")}</h3>
-            <table className="w-full text-xs">
-              <thead className="text-ink/50">
-                <tr>
-                  <th className="text-left py-1">{t("documents.labCols.test")}</th>
-                  <th className="text-left">{t("documents.labCols.value")}</th>
-                  <th className="text-left">{t("documents.labCols.unit")}</th>
-                  <th className="text-left">{t("documents.labCols.range")}</th>
-                  <th className="text-left">{t("documents.labCols.flag")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {doc.lab_values.map((lv) => (
-                  <tr key={lv.id} className="border-t border-ink/10">
-                    <td className="py-1">{lv.test_name_raw}</td>
-                    <td>{lv.value_numeric ?? lv.value_text ?? "—"}</td>
-                    <td>{lv.unit ?? "—"}</td>
-                    <td>
-                      {lv.reference_low ?? "—"} – {lv.reference_high ?? "—"}
-                    </td>
-                    <td>
-                      <AbnormalFlag flag={lv.is_abnormal} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {doc.clinician}
+            {doc.specialty && doc.specialty !== "—"
+              ? ` · ${doc.specialty}`
+              : ""}
+            {doc.facility && doc.facility !== "—"
+              ? ` · ${doc.facility}`
+              : ""}
           </div>
-        )}
+        </div>
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          {doc.hasMedia && doc._real && (
+            <a
+              href={api.mediaUrl(doc._real.media_id)}
+              target="_blank"
+              rel="noreferrer"
+              className="btn"
+            >
+              <span style={{ display: "inline-flex" }}>{Icons.ext}</span>
+              {t("documents.openOriginal", "Open original")}
+            </a>
+          )}
+        </div>
+      </div>
 
-        {doc.medications.length > 0 && (
-          <div>
-            <h3 className="text-sm font-medium mb-2">{t("documents.medications")}</h3>
-            <ul className="text-xs space-y-1">
-              {doc.medications.map((m) => (
-                <li key={m.id} className="border-l-2 border-accent/30 pl-2">
-                  <span className="font-medium">{m.drug_name_raw}</span>
-                  {m.dose && <span className="text-ink/60"> · {m.dose}</span>}
-                  {m.frequency && <span className="text-ink/60"> · {m.frequency}</span>}
-                  {m.duration && <span className="text-ink/60"> · {m.duration}</span>}
-                </li>
-              ))}
-            </ul>
+      {/* 3-cell field grid */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr 1fr",
+          gap: 12,
+          marginBottom: 20,
+        }}
+      >
+        <Field2
+          k={t("documents.fields.docDate", "Document date")}
+          v={<span className="mono">{doc.date}</span>}
+        />
+        <Field2
+          k={t("documents.fields.clinician", "Clinician")}
+          v={doc.clinician}
+        />
+        <Field2
+          k={t("documents.fields.facility", "Facility")}
+          v={doc.facility}
+        />
+      </div>
+
+      {/* Findings */}
+      {doc.findings && (
+        <Section title={t("documents.fields.findings", "Findings (verbatim)")}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13.5,
+              lineHeight: 1.6,
+              color: "var(--ink)",
+            }}
+          >
+            {doc.findings}
+          </p>
+        </Section>
+      )}
+
+      {/* Recommendations */}
+      {doc.recommendations && (
+        <Section
+          title={t(
+            "documents.fields.recommendations",
+            "Recommendations (verbatim)",
+          )}
+        >
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13.5,
+              lineHeight: 1.6,
+              color: "var(--ink)",
+            }}
+          >
+            {doc.recommendations}
+          </p>
+        </Section>
+      )}
+
+      {/* Lab values */}
+      {doc.labRows.length > 0 && (
+        <Section
+          title={t("documents.labs", "Lab values")}
+          right={
+            <span
+              className="mono"
+              style={{ fontSize: 11, color: "var(--ink-3)" }}
+            >
+              {doc.labRows.length}{" "}
+              {t("documents.valuesExtracted", "values extracted")}
+            </span>
+          }
+        >
+          <LabTable rows={doc.labRows} />
+        </Section>
+      )}
+
+      {/* Verify amber box */}
+      {!doc.verified && (
+        <div
+          style={{
+            marginTop: 24,
+            padding: 14,
+            borderRadius: 10,
+            background: "var(--warn-tint)",
+            border:
+              "1px solid color-mix(in oklch, var(--warn) 25%, var(--border))",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <span style={{ color: "var(--warn)", display: "inline-flex" }}>
+            {Icons.alert}
+          </span>
+          <div
+            style={{ flex: 1, fontSize: 12.5, color: "oklch(38% 0.10 75)" }}
+          >
+            <b style={{ color: "oklch(28% 0.10 75)" }}>
+              {t(
+                "documents.aiExtracted",
+                "AI extracted these fields from a photo.",
+              )}
+            </b>{" "}
+            {t(
+              "documents.disclaimer",
+              "Verify before treating any value as authoritative — this is not a diagnosis.",
+            )}
           </div>
-        )}
-
-        <div className="flex justify-end gap-2 pt-2">
           <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-md border border-ink/20 hover:bg-ink/5"
+            className="btn primary"
+            disabled={isDemo || verify.isPending}
+            onClick={() => !isDemo && verify.mutate()}
           >
-            {t("entry.cancel")}
-          </button>
-          <button
-            onClick={() =>
-              save.mutate({
-                doc_date: draft.doc_date,
-                clinician_name: draft.clinician_name,
-                clinician_specialty: draft.clinician_specialty,
-                facility: draft.facility,
-                findings_md: draft.findings_md,
-                recommendations_md: draft.recommendations_md,
-                user_verified: 1,
-              })
-            }
-            disabled={save.isPending}
-            className="px-4 py-2 rounded-md bg-accent hover:bg-accent/90 disabled:opacity-50"
-          >
-            {save.isPending ? t("documents.saving") : t("documents.confirm")}
+            {verify.isPending
+              ? t("documents.saving", "Saving…")
+              : t("documents.confirm", "Confirm & save")}
           </button>
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Field2 ─────────────────────────────────────────────────────────── */
+function Field2({ k, v }: { k: string; v: React.ReactNode }) {
+  return (
+    <div>
+      <div className="k-label">{k}</div>
+      <div style={{ fontSize: 13.5, color: "var(--ink)", marginTop: 3 }}>
+        {v}
       </div>
     </div>
   );
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string | null;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="block text-xs text-ink/50 mb-1">{label}</span>
-      <input
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full px-2 py-1.5 rounded bg-canvas border border-ink/15 text-sm"
-      />
-    </label>
-  );
-}
-
-function FieldArea({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string | null;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="block text-xs text-ink/50 mb-1">{label}</span>
-      <textarea
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value)}
-        rows={4}
-        className="w-full px-2 py-1.5 rounded bg-canvas border border-ink/15 text-sm"
-      />
-    </label>
-  );
-}
-
-function AbnormalFlag({ flag }: { flag: number | null }) {
-  if (flag === 1) return <span className="text-red-300">↑ high</span>;
-  if (flag === -1) return <span className="text-amber-300">↓ low</span>;
-  if (flag === 0) return <span className="text-emerald-300">in range</span>;
-  return <span className="text-ink/40">—</span>;
-}
-
-function DisclaimerBanner() {
+/* ─── LabTable ───────────────────────────────────────────────────────── */
+function LabTable({ rows }: { rows: LabRow[] }) {
   const { t } = useTranslation();
+  const cols = "2fr 1fr 1fr 1.4fr 90px";
+  const headers = [
+    t("documents.labCols.test", "Test"),
+    t("documents.labCols.value", "Value"),
+    t("documents.labCols.unit", "Unit"),
+    t("documents.labCols.range", "Reference"),
+    t("documents.labCols.flag", "Flag"),
+  ];
   return (
-    <div className="text-[11px] bg-amber-500/10 border border-amber-500/25 text-amber-200 rounded px-3 py-2">
-      {t("documents.disclaimer")}
+    <div className="card" style={{ overflow: "hidden" }}>
+      {/* header */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: cols,
+          gap: 0,
+          padding: "10px 14px",
+          background: "var(--surface-2)",
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
+        {headers.map((h) => (
+          <div key={h} className="k-label">
+            {h}
+          </div>
+        ))}
+      </div>
+      {/* rows */}
+      {rows.map((r, i) => (
+        <div
+          key={r.id}
+          style={{
+            display: "grid",
+            gridTemplateColumns: cols,
+            padding: "10px 14px",
+            alignItems: "center",
+            borderBottom:
+              i === rows.length - 1 ? "none" : "1px solid var(--border)",
+            fontSize: 12.5,
+          }}
+        >
+          <div style={{ fontWeight: 500 }}>{r.test}</div>
+          <div
+            className="mono"
+            style={{
+              fontWeight: 600,
+              color:
+                r.flag === "low"
+                  ? "var(--info)"
+                  : r.flag === "high"
+                    ? "var(--danger)"
+                    : "var(--ink)",
+            }}
+          >
+            {typeof r.value === "number" && r.value < 1
+              ? `1:${Math.round(1 / r.value)}`
+              : r.value}
+          </div>
+          <div className="mono" style={{ color: "var(--ink-3)" }}>
+            {r.unit}
+          </div>
+          <div className="mono" style={{ color: "var(--ink-3)" }}>
+            {r.ref}
+          </div>
+          <div>
+            {r.flag === "low" && (
+              <Pill tone="info" dot>
+                low
+              </Pill>
+            )}
+            {r.flag === "high" && (
+              <Pill tone="danger" dot>
+                high
+              </Pill>
+            )}
+            {r.flag === "normal" && (
+              <Pill tone="ok" dot>
+                in range
+              </Pill>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
